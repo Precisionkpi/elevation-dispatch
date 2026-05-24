@@ -1,0 +1,27 @@
+# Secrets — NEVER commit
+.streamlit/secrets.toml
+*.json.key
+service-account*.json
+gcp-key*.json
+
+# Local SQLite database + uploaded files
+dispatch.db
+uploads/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Dev-only utility (reads secrets locally; safe to commit but optional)
+# probe_fsp.py
+# inspect_spec.py
