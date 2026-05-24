@@ -1,8 +1,12 @@
 # Secrets — NEVER commit
 .streamlit/secrets.toml
+cloud-secrets.toml
 *.json.key
 service-account*.json
+sevice-account*.json
 gcp-key*.json
+oauth-client*.json
+client_secret*.json
 
 # Local SQLite database + uploaded files
 dispatch.db
