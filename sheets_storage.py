@@ -81,6 +81,49 @@ def _drive_service():
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
+_subfolder_cache: dict = {}
+
+
+def _get_or_create_subfolder(service, parent_id: str, name: str) -> str:
+    """Look up <name> subfolder under <parent_id>; create it if missing. Cached."""
+    key = (parent_id, name)
+    if key in _subfolder_cache:
+        return _subfolder_cache[key]
+
+    # Drive search — escape single quotes in the folder name
+    safe_name = name.replace("'", "\\'")
+    query = (
+        f"name = '{safe_name}' "
+        f"and mimeType = 'application/vnd.google-apps.folder' "
+        f"and '{parent_id}' in parents "
+        f"and trashed = false"
+    )
+    res = service.files().list(
+        q=query,
+        fields="files(id, name)",
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+        spaces="drive",
+    ).execute()
+    folders = res.get("files", [])
+    if folders:
+        folder_id = folders[0]["id"]
+    else:
+        created = service.files().create(
+            body={
+                "name": name,
+                "mimeType": "application/vnd.google-apps.folder",
+                "parents": [parent_id],
+            },
+            fields="id",
+            supportsAllDrives=True,
+        ).execute()
+        folder_id = created["id"]
+
+    _subfolder_cache[key] = folder_id
+    return folder_id
+
+
 def upload_to_drive(file_bytes: bytes, filename: str, mimetype: str = "application/octet-stream") -> str:
     """Upload bytes to Drive via Apps Script bridge (preferred) or direct API.
 
@@ -95,14 +138,28 @@ def upload_to_drive(file_bytes: bytes, filename: str, mimetype: str = "applicati
     if not config.GOOGLE_DRIVE_FOLDER_ID:
         raise RuntimeError("No upload destination configured.")
 
-    # Direct Drive API path (will fail without a Shared Drive on free Workspace)
+    # Direct Drive API path (works with Shared Drives)
     import io
     from googleapiclient.http import MediaIoBaseUpload
 
     service = _drive_service()
+
+    # Drop into a Photos subfolder if configured (auto-created)
+    target_folder = config.GOOGLE_DRIVE_FOLDER_ID
+    if config.GOOGLE_DRIVE_PHOTOS_SUBFOLDER:
+        try:
+            target_folder = _get_or_create_subfolder(
+                service,
+                config.GOOGLE_DRIVE_FOLDER_ID,
+                config.GOOGLE_DRIVE_PHOTOS_SUBFOLDER,
+            )
+        except Exception:
+            # Fall back to the root folder if subfolder lookup/create fails
+            target_folder = config.GOOGLE_DRIVE_FOLDER_ID
+
     media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=mimetype, resumable=False)
     created = service.files().create(
-        body={"name": filename, "parents": [config.GOOGLE_DRIVE_FOLDER_ID]},
+        body={"name": filename, "parents": [target_folder]},
         media_body=media,
         fields="id, webViewLink",
         supportsAllDrives=True,

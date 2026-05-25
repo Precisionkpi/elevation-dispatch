@@ -59,6 +59,9 @@ GOOGLE_SHEET_ID = _get("GOOGLE_SHEET_ID", "")
 GOOGLE_SHEET_WORKSHEET = _get("GOOGLE_SHEET_WORKSHEET", "Dispatches")
 # Drive folder to upload W&B + Weather images into.
 GOOGLE_DRIVE_FOLDER_ID = _get("GOOGLE_DRIVE_FOLDER_ID", "")
+# Optional subfolder inside the Drive folder where uploaded images go.
+# Auto-created on first upload. Set to "" to drop files in the root folder.
+GOOGLE_DRIVE_PHOTOS_SUBFOLDER = _get("GOOGLE_DRIVE_PHOTOS_SUBFOLDER", "Photos")
 
 # Google Apps Script web-app URL used to upload files. Apps Script runs as
 # the user who deployed it, so it bypasses the 'service accounts have no
