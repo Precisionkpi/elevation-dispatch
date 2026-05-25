@@ -871,6 +871,7 @@ if st.button("Submit Dispatch", type="primary"):
                     weather_url=weather_url,
                     wb_filename=(wb_file.name if wb_file else ""),
                     weather_filename=(weather_file.name if weather_file else ""),
+                    reservation_number=str(reservation.get("number")) if reservation and reservation.get("number") else "",
                 )
                 sheet_msg = " · logged to Google Sheet"
             except Exception as e:

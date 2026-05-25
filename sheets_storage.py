@@ -240,7 +240,8 @@ def append_dispatch(record: dict, *, pilot_email: str = "", squawks_count: int =
                     grounded: bool = False, hobbs: Optional[float] = None,
                     tach: Optional[float] = None,
                     wb_url: str = "", weather_url: str = "",
-                    wb_filename: str = "", weather_filename: str = "") -> Optional[int]:
+                    wb_filename: str = "", weather_filename: str = "",
+                    reservation_number: str = "") -> Optional[int]:
     """Append a dispatch record as a new row.
 
     If wb_url / weather_url are provided (Drive links), they're written as
@@ -274,7 +275,7 @@ def append_dispatch(record: dict, *, pilot_email: str = "", squawks_count: int =
         "Yes" if grounded else "No",
         wb_cell,
         weather_cell,
-        "",  # Reservation # placeholder
+        reservation_number,
         record.get("fsp_aircraft_id", ""),
         record.get("student_on_flight", ""),  # appended last
     ]
