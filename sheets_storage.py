@@ -16,7 +16,6 @@ HEADER_ROW = [
     "Submitted At",
     "Pilot Email",
     "Pilot Name",
-    "Flying With (if Instructor)",
     "Flight Date",
     "Block Time",
     "Instructor",
@@ -36,6 +35,7 @@ HEADER_ROW = [
     "Weather Image (filename)",
     "FSP Reservation #",
     "FSP Aircraft ID",
+    "Flying With (if Instructor)",  # appended last to preserve column order
 ]
 
 
@@ -257,7 +257,6 @@ def append_dispatch(record: dict, *, pilot_email: str = "", squawks_count: int =
         submitted,
         pilot_email,
         record.get("pilot_name", ""),
-        record.get("student_on_flight", ""),
         record.get("flight_date", ""),
         record.get("block_time", ""),
         record.get("instructor", ""),
@@ -277,6 +276,7 @@ def append_dispatch(record: dict, *, pilot_email: str = "", squawks_count: int =
         weather_cell,
         "",  # Reservation # placeholder
         record.get("fsp_aircraft_id", ""),
+        record.get("student_on_flight", ""),  # appended last
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
     try:
