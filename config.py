@@ -35,7 +35,7 @@ COMPANY_NAME = _get("COMPANY_NAME", "Elevation Aviation")
 DISPATCH_TITLE = _get("DISPATCH_TITLE", "Dispatch")
 DISPATCH_SUBTITLE = _get(
     "DISPATCH_SUBTITLE",
-    "Complete Elevation Aviation dispatch from prior to each flight",
+    "Complete Elevation Aviation dispatch form prior to each flight",
 )
 LOGO_PATH = _get("LOGO_PATH", os.path.join(_HERE, "elevation_logo.png"))
 
