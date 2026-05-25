@@ -16,7 +16,7 @@ HEADER_ROW = [
     "Submitted At",
     "Pilot Email",
     "Pilot Name",
-    "Student (if Instructor)",
+    "Flying With (if Instructor)",
     "Flight Date",
     "Block Time",
     "Instructor",
