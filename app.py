@@ -492,24 +492,32 @@ if reservation and reservation.get("start_time"):
         pass
 block_time = st.time_input("Block Time *", value=default_block, help="Flight start time")
 
-# ── Flying with (shown only when an Instructor is signed in) ──
-# Covers dual-instruction students AND another instructor for currency /
-# requalification flights. Auto-filled from the reservation's pilots[].
+# ── Flying with (shown for Instructor / Renter / Owner) ────
+# Covers dual-instruction students, another instructor for currency /
+# requalification flights, passengers, or any other non-self pilot on the
+# reservation. Auto-filled from reservation.pilots[] with the signed-in
+# user's own name removed.
 student_on_flight = ""
-if matched_role := (selected_student or {}).get("primary_role"):
-    if matched_role == "Instructor":
-        default_other_pilot = ""
-        if reservation and reservation.get("pilot_names"):
-            default_other_pilot = ", ".join(reservation["pilot_names"])
-        student_on_flight = st.text_input(
-            "Flying with (student or co-pilot)",
-            value=default_other_pilot,
-            help=(
-                "Auto-filled from your FSP reservation. "
-                "Works for dual students or another instructor (currency / "
-                "requalification flights). Leave blank for solo / personal time."
-            ),
-        )
+matched_role = (selected_student or {}).get("primary_role")
+if matched_role in ("Instructor", "Renter", "Owner"):
+    default_other_pilot = ""
+    if reservation and reservation.get("pilot_names"):
+        my_name_lc = (selected_student.get("name") or "").lower()
+        others = [
+            n for n in reservation["pilot_names"]
+            if n and n.lower() != my_name_lc
+        ]
+        default_other_pilot = ", ".join(others)
+    student_on_flight = st.text_input(
+        "Flying with (passenger, student, or co-pilot)",
+        value=default_other_pilot,
+        help=(
+            "Auto-filled from your FSP reservation (excluding yourself). "
+            "Works for dual students, a co-instructor (currency / requalification), "
+            "or a passenger. Type a name if they're not in FSP. "
+            "Leave blank for solo / personal time."
+        ),
+    )
 
 # ── Instructor (default from reservation) ──────────────────
 NO_INSTRUCTOR = "N/A-Solo"
