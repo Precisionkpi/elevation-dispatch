@@ -94,11 +94,30 @@ def generate_pdf(dispatch_id):
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, f"{config.COMPANY_NAME} - Dispatch #{dispatch_id}", ln=1)
+    # Header
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(15, 31, 58)
+    pdf.cell(0, 12, f"{config.COMPANY_NAME} Dispatch #{dispatch_id}", ln=1)
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"Submitted: {row['created_at']}", ln=1)
-    pdf.ln(4)
+    pdf.set_text_color(100, 116, 139)
+    pdf.cell(0, 5, f"Submitted: {row.get('created_at', '')}", ln=1)
+    pdf.ln(6)
+
+    def _kv(label, value):
+        # Label on one line, value (possibly long) on the next — avoids fpdf2's
+        # "not enough horizontal space" error when the cursor is offset.
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(100, 116, 139)
+        pdf.cell(0, 4, label.upper(), ln=1)
+        pdf.set_font("Helvetica", "", 11)
+        pdf.set_text_color(15, 31, 58)
+        try:
+            pdf.multi_cell(0, 6, str(value if value not in (None, "") else "—"))
+        except Exception:
+            # Fallback: truncate hard if a value still won't fit
+            text = str(value or "—")[:200]
+            pdf.cell(0, 6, text, ln=1)
+        pdf.ln(1)
 
     fields = [
         ("Pilot", row.get("pilot_name")),
@@ -108,33 +127,37 @@ def generate_pdf(dispatch_id):
         ("Aircraft", row.get("aircraft")),
         ("Flight Type", row.get("flight_type")),
         ("Route", row.get("route")),
-        ("NOTAMs/TFRs Checked", "Yes" if row.get("notams_tfr_checked") else "No"),
+        ("NOTAMs / TFRs Checked", "Yes" if row.get("notams_tfr_checked") else "No"),
         ("Flight Plans Filed", row.get("flight_plans")),
-        ("Tach until next MX", row.get("tach_until_mx")),
+        ("Tach hours until next MX", row.get("tach_until_mx")),
         ("Days until next Inspection", row.get("days_until_inspection")),
         ("Squawks Acknowledged", "Yes" if row.get("squawks_acknowledged") else "No"),
     ]
     for label, value in fields:
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(60, 7, f"{label}:")
-        pdf.set_font("Helvetica", "", 11)
-        pdf.multi_cell(0, 7, str(value or ""))
+        _kv(label, value)
 
     if row.get("open_squawks"):
-        pdf.ln(4)
+        pdf.ln(3)
         pdf.set_font("Helvetica", "B", 12)
+        pdf.set_text_color(15, 31, 58)
         pdf.cell(0, 7, "Open Squawks at Dispatch", ln=1)
         pdf.set_font("Helvetica", "", 10)
         try:
             squawks = json.loads(row["open_squawks"])
             if not squawks:
-                pdf.cell(0, 6, "None.", ln=1)
+                pdf.cell(0, 5, "None.", ln=1)
             for s in squawks:
-                desc = s.get("description") or "(no description)"
-                rep = s.get("reported_date") or "?"
-                pdf.multi_cell(0, 5, f"- {desc}  [reported {rep}]")
+                desc = (s.get("description") or "(no description)").strip()
+                rep = (s.get("reported_date") or "")[:10] if s.get("reported_date") else "?"
+                try:
+                    pdf.multi_cell(0, 5, f"- {desc}  (reported {rep})")
+                except Exception:
+                    pdf.cell(0, 5, f"- {desc[:120]}", ln=1)
         except (json.JSONDecodeError, TypeError):
-            pdf.multi_cell(0, 5, str(row["open_squawks"]))
+            try:
+                pdf.multi_cell(0, 5, str(row["open_squawks"])[:500])
+            except Exception:
+                pass
 
     for label, path in [
         ("Weight & Balance", row.get("wb_image_path")),
@@ -142,8 +165,10 @@ def generate_pdf(dispatch_id):
     ]:
         if path and os.path.exists(path):
             pdf.add_page()
-            pdf.set_font("Helvetica", "B", 12)
+            pdf.set_font("Helvetica", "B", 14)
+            pdf.set_text_color(15, 31, 58)
             pdf.cell(0, 8, label, ln=1)
+            pdf.ln(2)
             ext = os.path.splitext(path)[1].lower()
             if ext in (".png", ".jpg", ".jpeg"):
                 try:

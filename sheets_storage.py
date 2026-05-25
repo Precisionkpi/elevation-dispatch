@@ -49,22 +49,66 @@ def enabled() -> bool:
         return False
 
 
+def _creds_info():
+    import streamlit as st
+    creds_info = dict(st.secrets["gcp_service_account"])
+    if "\\n" in creds_info.get("private_key", ""):
+        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+    return creds_info
+
+
 def _client():
     """Return a gspread client authorized via the service account in st.secrets."""
-    import streamlit as st
     import gspread
     from google.oauth2.service_account import Credentials
 
-    creds_info = dict(st.secrets["gcp_service_account"])
-    # Streamlit reads multi-line private_key with literal "\n"; reassemble.
-    if "\\n" in creds_info.get("private_key", ""):
-        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-    creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+    creds = Credentials.from_service_account_info(_creds_info(), scopes=scopes)
     return gspread.authorize(creds)
+
+
+def _drive_service():
+    from google.oauth2.service_account import Credentials
+    from googleapiclient.discovery import build
+    creds = Credentials.from_service_account_info(
+        _creds_info(),
+        scopes=["https://www.googleapis.com/auth/drive"],
+    )
+    return build("drive", "v3", credentials=creds, cache_discovery=False)
+
+
+def upload_to_drive(file_bytes: bytes, filename: str, mimetype: str = "application/octet-stream") -> str:
+    """Upload bytes to the service account's Drive, make link-shareable, return view URL."""
+    import io
+    from googleapiclient.http import MediaIoBaseUpload
+
+    service = _drive_service()
+    media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=mimetype, resumable=False)
+    created = service.files().create(
+        body={"name": filename},
+        media_body=media,
+        fields="id, webViewLink",
+    ).execute()
+    file_id = created["id"]
+    # Make readable by anyone with the link
+    service.permissions().create(
+        fileId=file_id,
+        body={"role": "reader", "type": "anyone"},
+        fields="id",
+    ).execute()
+    return created.get("webViewLink") or f"https://drive.google.com/file/d/{file_id}/view"
+
+
+def _hyperlink(url: str, label: str) -> str:
+    """Wrap a URL as a Sheet HYPERLINK formula. value_input_option=USER_ENTERED parses it."""
+    if not url:
+        return ""
+    safe_url = url.replace('"', '%22')
+    safe_label = (label or "Open").replace('"', "'")
+    return f'=HYPERLINK("{safe_url}", "{safe_label}")'
 
 
 def _open_worksheet():
@@ -92,12 +136,20 @@ def _open_worksheet():
 def append_dispatch(record: dict, *, pilot_email: str = "", squawks_count: int = 0,
                     grounded: bool = False, hobbs: Optional[float] = None,
                     tach: Optional[float] = None,
+                    wb_url: str = "", weather_url: str = "",
                     wb_filename: str = "", weather_filename: str = "") -> Optional[int]:
-    """Append a dispatch record as a new row. Returns 1-indexed row number written, or None."""
+    """Append a dispatch record as a new row.
+
+    If wb_url / weather_url are provided (Drive links), they're written as
+    HYPERLINK formulas so the Sheet shows clickable "View W&B" / "View Weather"
+    cells. Falls back to filename text if URL not given.
+    """
     if not enabled():
         return None
     ws = _open_worksheet()
     submitted = record.get("created_at") or datetime.now().isoformat(timespec="seconds")
+    wb_cell = _hyperlink(wb_url, f"View W&B ({wb_filename})") if wb_url else wb_filename
+    weather_cell = _hyperlink(weather_url, f"View Weather ({weather_filename})") if weather_url else weather_filename
     row = [
         submitted,
         pilot_email,
@@ -117,13 +169,12 @@ def append_dispatch(record: dict, *, pilot_email: str = "", squawks_count: int =
         squawks_count,
         "Yes" if record.get("squawks_acknowledged") else "No",
         "Yes" if grounded else "No",
-        wb_filename,
-        weather_filename,
-        "",  # Reservation # will be added by app if known
+        wb_cell,
+        weather_cell,
+        "",  # Reservation # placeholder
         record.get("fsp_aircraft_id", ""),
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
-    # Return current row count (approximate — gspread doesn't give index directly)
     try:
         return len(ws.get_all_values())
     except Exception:

@@ -754,8 +754,43 @@ if st.button("Submit Dispatch", type="primary"):
         # Also append to Google Sheet if configured
         sheet_msg = ""
         if sheets_storage.enabled():
+            grounded_flag = any(s.get("ground_aircraft") for s in squawks)
+
+            # Upload images to Drive (clickable links go into the Sheet)
+            wb_url = ""
+            weather_url = ""
+
+            def _mime(name):
+                lname = (name or "").lower()
+                if lname.endswith(".png"):
+                    return "image/png"
+                if lname.endswith(".jpg") or lname.endswith(".jpeg"):
+                    return "image/jpeg"
+                if lname.endswith(".pdf"):
+                    return "application/pdf"
+                return "application/octet-stream"
+
+            with st.spinner("Uploading attachments..."):
+                if wb_file:
+                    try:
+                        wb_url = sheets_storage.upload_to_drive(
+                            wb_file.getvalue(),
+                            f"dispatch-{dispatch_id}-wb-{wb_file.name}",
+                            _mime(wb_file.name),
+                        )
+                    except Exception as e:
+                        st.warning(f"W&B Drive upload failed: {e}")
+                if weather_file:
+                    try:
+                        weather_url = sheets_storage.upload_to_drive(
+                            weather_file.getvalue(),
+                            f"dispatch-{dispatch_id}-weather-{weather_file.name}",
+                            _mime(weather_file.name),
+                        )
+                    except Exception as e:
+                        st.warning(f"Weather Drive upload failed: {e}")
+
             try:
-                grounded_flag = any(s.get("ground_aircraft") for s in squawks)
                 sheets_storage.append_dispatch(
                     record,
                     pilot_email=user_email,
@@ -763,6 +798,8 @@ if st.button("Submit Dispatch", type="primary"):
                     grounded=grounded_flag,
                     hobbs=(ac_meter or {}).get("hobbs") if ac_meter else None,
                     tach=(ac_meter or {}).get("tach") if ac_meter else None,
+                    wb_url=wb_url,
+                    weather_url=weather_url,
                     wb_filename=(wb_file.name if wb_file else ""),
                     weather_filename=(weather_file.name if weather_file else ""),
                 )
