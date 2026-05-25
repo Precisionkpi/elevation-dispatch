@@ -638,7 +638,10 @@ flight_type = st.radio("Flight Type *", options=config.FLIGHT_TYPES, index=None)
 # free-text field grouped underneath.
 st.markdown(
     '<div style="font-weight:600;color:#0c2340;font-size:0.92rem;'
-    'margin:0.5rem 0 0.25rem 0">Route of Flight *</div>',
+    'margin:0.5rem 0 0.1rem 0">Route of Flight *</div>'
+    '<div style="font-size:0.8rem;color:#64748b;'
+    'margin-bottom:0.4rem">Check the Practice Area box if that\'s where '
+    'you\'re going. Otherwise, type the route in the field below.</div>',
     unsafe_allow_html=True,
 )
 practice_area = st.checkbox("Practice Area", value=False)
