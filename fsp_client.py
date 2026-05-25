@@ -226,6 +226,48 @@ class FSPClient:
         out.sort(key=lambda s: (not s["ground_aircraft"], s.get("reported_date") or ""))
         return out
 
+    # ── Pilots (anyone who can fill out a dispatch) ────────
+    def list_pilots(self, allowed_roles=("Students", "Instructors", "Renters", "Owners")):
+        """Return all people who could file a dispatch: students, instructors,
+        renters, owners. Filtered client-side from /people (server-side role
+        filter on /people is silently ignored)."""
+        data = self._get(
+            f"operators/{self.operator_id}/people",
+            params={"limit": 500},
+        )
+        allowed = set(allowed_roles)
+        # Prefer Instructor > Student > Renter > Owner when tagging primary role
+        priority = {"Instructors": "Instructor", "Students": "Student",
+                    "Renters": "Renter", "Owners": "Owner"}
+        out = []
+        for p in self._items(data):
+            if not isinstance(p, dict):
+                continue
+            role_names = {(r or {}).get("name") for r in (p.get("roles") or []) if r}
+            flying_roles = role_names & allowed
+            if not flying_roles:
+                continue
+            first = p.get("firstName") or ""
+            last = p.get("lastName") or ""
+            name = f"{first} {last}".strip() or p.get("email") or "?"
+            # Pick the highest-priority role to display
+            primary_role = next(
+                (priority[r] for r in ("Instructors", "Students", "Renters", "Owners")
+                 if r in flying_roles),
+                "Pilot",
+            )
+            out.append({
+                "id": p.get("userGuidId"),
+                "name": name,
+                "email": p.get("email"),
+                "phone": p.get("phone"),
+                "primary_role": primary_role,
+                "roles": sorted(flying_roles),
+                "raw": p,
+            })
+        out.sort(key=lambda x: x["name"].upper())
+        return out
+
     # ── Students (people with "Students" role) ────────────
     def list_students(self):
         """Return all people whose roles contain 'Students'.

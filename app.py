@@ -241,6 +241,11 @@ def cached_students():
     return _client().list_students()
 
 
+@st.cache_data(ttl=300)
+def cached_pilots():
+    return _client().list_pilots()
+
+
 @st.cache_data(ttl=120)
 def cached_aircraft_meters():
     return _client().list_aircraft_meters()
@@ -363,9 +368,9 @@ if config.FSP_API_KEY:
     except FSPError as e:
         fsp_errors.append(f"Instructors: {e}")
     try:
-        student_list = cached_students()
+        student_list = cached_pilots()
     except FSPError as e:
-        fsp_errors.append(f"Students: {e}")
+        fsp_errors.append(f"People: {e}")
 else:
     st.warning(
         "Flight Schedule Pro API key not configured. The form will still work, "
@@ -393,17 +398,19 @@ if AUTH_ENABLED:
     if matched:
         selected_student = matched
         name = selected_student["name"]
+        role_label = (matched.get("primary_role") or "PILOT").upper()
         st.markdown(
             f'<div class="ac-banner"><div><div class="ac-tail">{name}</div>'
             f'<div class="ac-model">{user_email}</div></div>'
-            f'<div class="ac-status">STUDENT</div></div>',
+            f'<div class="ac-status">{role_label}</div></div>',
             unsafe_allow_html=True,
         )
     else:
         st.error(
             f"Hi {user_name_from_auth or user_email}! Your Google account email "
-            f"**{user_email}** is not registered as a student in Flight Schedule Pro. "
-            "Please contact the school admin to be added as a student."
+            f"**{user_email}** is not registered in Flight Schedule Pro under a "
+            "flying role (Student, Instructor, Renter, or Owner). Please contact "
+            "the school admin to be added."
         )
         st.stop()
 elif student_list:
