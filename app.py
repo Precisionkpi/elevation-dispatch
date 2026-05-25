@@ -199,9 +199,17 @@ st.markdown("""
   .status-warn { background: #fef3c7; color: #92400e; }
   .status-danger { background: #fee2e2; color: #991b1b; }
 
-  /* Hide Streamlit chrome */
-  footer { visibility: hidden; }
-  #MainMenu { visibility: hidden; }
+  /* Hide Streamlit chrome and Community Cloud branding */
+  footer { visibility: hidden !important; display: none !important; }
+  #MainMenu { visibility: hidden !important; display: none !important; }
+  .stDeployButton { display: none !important; }
+  /* Hosted with Streamlit badge — class names change between releases,
+     so cover the common ones */
+  [class*="viewerBadge_"] { display: none !important; }
+  [class*="ViewerBadge_"] { display: none !important; }
+  div[data-testid="stDecoration"] { display: none !important; }
+  div[data-testid="stToolbar"] { display: none !important; }
+  ._terminalButton_rix23_138 { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
