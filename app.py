@@ -654,20 +654,20 @@ _section("Pre-flight Briefing")
 # ── Remaining form fields ──────────────────────────────────
 flight_type = st.radio("Flight Type *", options=config.FLIGHT_TYPES, index=None)
 
-# Route of Flight — default to Practice Area, only collect a typed value when
-# the pilot un-checks the box. Stops people leaving 'Practice Area' on
-# autopilot for non-practice flights.
+# Route of Flight — student must actively check Practice Area or type a route.
+# Forces a conscious choice every flight rather than leaving Practice Area on
+# autopilot.
 practice_area = st.checkbox(
-    "Flight to **Practice Area** (uncheck to type a different route)",
-    value=True,
+    "Practice Area (check to auto-fill, or type a route below)",
+    value=False,
 )
 if practice_area:
     route = "Practice Area"
 else:
     route = st.text_input(
         "Route of Flight *",
-        placeholder="e.g. KHEF - Practice Area - KHEF, or KHEF KCJR KHEF",
-        help="Type the route since this flight isn't going to the practice area.",
+        placeholder="e.g. KHEF KCJR KHEF",
+        help="Type the route, or check the Practice Area box above.",
     )
 
 wb_file = st.file_uploader(
