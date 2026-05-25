@@ -293,18 +293,24 @@ def _auth_enabled():
 
     Accepts both flat single-provider ([auth] with client_id) and
     multi-provider ([auth.google] with client_id, [auth] with redirect_uri
-    and cookie_secret) formats.
+    and cookie_secret) formats. Uses duck typing because Streamlit's
+    Secrets object doesn't subclass dict.
     """
     try:
         auth = st.secrets.get("auth", {})
         if not auth:
             return False
+        # Single-provider: client_id directly under [auth]
         if auth.get("client_id"):
             return True
-        # Multi-provider: any [auth.<provider>] with client_id
-        for key, val in dict(auth).items():
-            if isinstance(val, dict) and val.get("client_id"):
-                return True
+        # Multi-provider: any sub-section that has a client_id
+        for key in list(auth.keys()):
+            try:
+                sub = auth[key]
+                if hasattr(sub, "get") and sub.get("client_id"):
+                    return True
+            except (TypeError, AttributeError, KeyError):
+                continue
         return False
     except Exception:
         return False
