@@ -253,6 +253,11 @@ def cached_reservations(student_id, day_iso):
     )
 
 
+@st.cache_data(ttl=120)
+def cached_next_reservation(student_id):
+    return _client().get_next_reservation_for_student(student_id)
+
+
 def _fmt_pair(pair, suffix):
     if not pair:
         return "—"
@@ -433,8 +438,26 @@ else:
     name = st.text_input("Name *",
                          help="FSP student list unavailable; enter manually")
 
-# ── Date ───────────────────────────────────────────────────
-flight_date = st.date_input("Date *", value=date_cls.today())
+# ── Date (default to student's next upcoming reservation) ──
+default_date = date_cls.today()
+if selected_student:
+    try:
+        next_res = cached_next_reservation(selected_student["id"])
+        if next_res and next_res.get("start_time"):
+            try:
+                res_date = datetime.fromisoformat(next_res["start_time"]).date()
+                if res_date >= date_cls.today():
+                    default_date = res_date
+            except ValueError:
+                pass
+    except FSPError:
+        pass
+flight_date = st.date_input(
+    "Date *",
+    value=default_date,
+    help=("Defaults to your next upcoming reservation in FSP. "
+          "Change to any date to override."),
+)
 
 # ── Reservation lookup (student + date) ────────────────────
 reservation = None

@@ -295,6 +295,36 @@ class FSPClient:
         out.sort(key=lambda r: r.get("start_time") or "")
         return out
 
+    def get_next_reservation_for_student(self, user_id, lookahead_days=90):
+        """Return the soonest upcoming reservation for this student, or None."""
+        if not user_id:
+            return None
+        today = date.today()
+        start = datetime.combine(today, datetime.min.time())
+        end = datetime.combine(today + timedelta(days=lookahead_days), datetime.min.time())
+        params = {
+            "startTimeUtc": f"Gte:{start.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+            "endTimeUtc": f"Lte:{end.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+            "userId": f"eq:{user_id}",
+            "limit": 100,
+        }
+        try:
+            data = self._get(
+                f"operators/{self.operator_id}/reservations",
+                params=params,
+                base=self.scheduling_base_url,
+            )
+        except FSPError:
+            return None
+        items = self._items(data)
+        # Sort by local start time, take soonest
+        items.sort(key=lambda r: r.get("startTime") or "9999")
+        for r in items:
+            if not isinstance(r, dict):
+                continue
+            return self._normalize_reservation(r)
+        return None
+
     @staticmethod
     def _normalize_reservation(r):
         instr = r.get("instructor") or {}
