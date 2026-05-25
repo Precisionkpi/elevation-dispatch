@@ -81,24 +81,46 @@ def _drive_service():
 
 
 def upload_to_drive(file_bytes: bytes, filename: str, mimetype: str = "application/octet-stream") -> str:
-    """Upload bytes to the service account's Drive, make link-shareable, return view URL."""
+    """Upload bytes to a Drive folder shared with the service account.
+
+    Requires GOOGLE_DRIVE_FOLDER_ID to be set — the service account itself has
+    no personal storage quota, so files must be created inside a folder owned
+    by a real user that has been shared with the service account as Editor.
+    """
+    if not config.GOOGLE_DRIVE_FOLDER_ID:
+        raise RuntimeError(
+            "GOOGLE_DRIVE_FOLDER_ID is not set. Create a folder in your Drive, "
+            "share it with the service account email as Editor, and add the "
+            "folder ID to secrets."
+        )
+
     import io
     from googleapiclient.http import MediaIoBaseUpload
 
     service = _drive_service()
     media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=mimetype, resumable=False)
     created = service.files().create(
-        body={"name": filename},
+        body={
+            "name": filename,
+            "parents": [config.GOOGLE_DRIVE_FOLDER_ID],
+        },
         media_body=media,
         fields="id, webViewLink",
+        supportsAllDrives=True,
     ).execute()
     file_id = created["id"]
     # Make readable by anyone with the link
-    service.permissions().create(
-        fileId=file_id,
-        body={"role": "reader", "type": "anyone"},
-        fields="id",
-    ).execute()
+    try:
+        service.permissions().create(
+            fileId=file_id,
+            body={"role": "reader", "type": "anyone"},
+            fields="id",
+            supportsAllDrives=True,
+        ).execute()
+    except Exception:
+        # If we can't set link-sharing (Workspace restriction), file is still in
+        # the folder which the user owns and can access. Skip silently.
+        pass
     return created.get("webViewLink") or f"https://drive.google.com/file/d/{file_id}/view"
 
 

@@ -35,6 +35,7 @@ if not LOCAL_SECRETS.exists():
 fsp_key = ""
 fsp_operator = ""
 sheet_id = ""
+drive_folder_id = ""
 for line in LOCAL_SECRETS.read_text(encoding="utf-8").splitlines():
     line = line.strip()
     if line.startswith("FSP_API_KEY"):
@@ -43,6 +44,8 @@ for line in LOCAL_SECRETS.read_text(encoding="utf-8").splitlines():
         fsp_operator = line.split("=", 1)[1].strip().strip('"').strip("'")
     elif line.startswith("GOOGLE_SHEET_ID"):
         sheet_id = line.split("=", 1)[1].strip().strip('"').strip("'")
+    elif line.startswith("GOOGLE_DRIVE_FOLDER_ID"):
+        drive_folder_id = line.split("=", 1)[1].strip().strip('"').strip("'")
 
 if not fsp_key:
     fail("FSP_API_KEY not found in .streamlit/secrets.toml")
@@ -114,6 +117,7 @@ out.append(f"FSP_OPERATOR_ID = {toml_str(fsp_operator)}")
 out.append("")
 out.append(f"GOOGLE_SHEET_ID = {toml_str(sheet_id)}")
 out.append('GOOGLE_SHEET_WORKSHEET = "Dispatches"')
+out.append(f"GOOGLE_DRIVE_FOLDER_ID = {toml_str(drive_folder_id)}")
 out.append("")
 out.append("[google_oauth]")
 out.append(f"client_id = {toml_str(client_id)}")

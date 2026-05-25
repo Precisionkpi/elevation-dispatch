@@ -57,6 +57,10 @@ FSP_REPORTS_BASE_URL = _get(
 # appended to that sheet. Falls back to SQLite-only if either is missing.
 GOOGLE_SHEET_ID = _get("GOOGLE_SHEET_ID", "")
 GOOGLE_SHEET_WORKSHEET = _get("GOOGLE_SHEET_WORKSHEET", "Dispatches")
+# Drive folder to upload W&B + Weather images into. Must be a folder in
+# YOUR Drive shared with the service account as Editor (service accounts
+# don't have their own storage quota).
+GOOGLE_DRIVE_FOLDER_ID = _get("GOOGLE_DRIVE_FOLDER_ID", "")
 
 # Storage (local backup; primary in dev, secondary in prod)
 DB_FILE = _get("DB_FILE", os.path.join(_HERE, "dispatch.db"))
