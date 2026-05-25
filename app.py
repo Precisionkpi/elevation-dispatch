@@ -200,16 +200,28 @@ st.markdown("""
   .status-danger { background: #fee2e2; color: #991b1b; }
 
   /* Hide Streamlit chrome and Community Cloud branding */
-  footer { visibility: hidden !important; display: none !important; }
-  #MainMenu { visibility: hidden !important; display: none !important; }
+  footer, #MainMenu { visibility: hidden !important; display: none !important; }
   .stDeployButton { display: none !important; }
-  /* Hosted with Streamlit badge — class names change between releases,
-     so cover the common ones */
-  [class*="viewerBadge_"] { display: none !important; }
-  [class*="ViewerBadge_"] { display: none !important; }
-  div[data-testid="stDecoration"] { display: none !important; }
-  div[data-testid="stToolbar"] { display: none !important; }
-  ._terminalButton_rix23_138 { display: none !important; }
+
+  /* "Hosted with Streamlit" badge — class names mutate per release */
+  [class*="viewerBadge"], [class*="ViewerBadge"],
+  [class*="hostedBadge"], [class*="HostedBadge"],
+  a[href*="streamlit.io"], a[href*="share.streamlit.io"] {
+    display: none !important;
+  }
+
+  /* Top-right toolbar (the small purple/grey logo) */
+  div[data-testid="stStatusWidget"],
+  div[data-testid="stToolbar"],
+  div[data-testid="stDecoration"],
+  div[data-testid="stHeader"] [data-testid="stToolbarActions"],
+  header[data-testid="stHeader"] { display: none !important; }
+
+  /* Status icons / spinners injected by the runtime */
+  [class*="StatusWidget"],
+  [class*="ConnectionStatus"] {
+    display: none !important;
+  }
 </style>
 """, unsafe_allow_html=True)
 
