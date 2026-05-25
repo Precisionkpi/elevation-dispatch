@@ -10,6 +10,7 @@ from datetime import date as date_cls, datetime
 import streamlit as st
 
 import config
+import custom_auth
 import sheets_storage
 import storage
 from fsp_client import FSPClient, FSPError
@@ -287,36 +288,8 @@ def _days_status(days):
     return "danger" if days < 7 else "warn" if days < 30 else "ok"
 
 
-# ── AUTH GATE (Google OAuth via st.login) ──────────────────
-def _auth_enabled():
-    """Auth is required when [auth] secrets are configured.
-
-    Accepts both flat single-provider ([auth] with client_id) and
-    multi-provider ([auth.google] with client_id, [auth] with redirect_uri
-    and cookie_secret) formats. Uses duck typing because Streamlit's
-    Secrets object doesn't subclass dict.
-    """
-    try:
-        auth = st.secrets.get("auth", {})
-        if not auth:
-            return False
-        # Single-provider: client_id directly under [auth]
-        if auth.get("client_id"):
-            return True
-        # Multi-provider: any sub-section that has a client_id
-        for key in list(auth.keys()):
-            try:
-                sub = auth[key]
-                if hasattr(sub, "get") and sub.get("client_id"):
-                    return True
-            except (TypeError, AttributeError, KeyError):
-                continue
-        return False
-    except Exception:
-        return False
-
-
-AUTH_ENABLED = _auth_enabled()
+# ── AUTH GATE (custom Google OAuth — bypasses st.login) ───
+AUTH_ENABLED = custom_auth.is_configured()
 
 
 def _render_logo():
@@ -333,19 +306,20 @@ def _render_logo():
 user_email = ""
 user_name_from_auth = ""
 if AUTH_ENABLED:
-    is_logged_in = bool(getattr(getattr(st, "user", None), "is_logged_in", False))
-    if not is_logged_in:
+    # If we just came back from Google with ?code=, process it.
+    if custom_auth.handle_callback():
+        st.rerun()
+    user = custom_auth.get_user()
+    if not user:
         _render_logo()
         st.title(config.DISPATCH_TITLE)
         st.markdown(f"**{config.DISPATCH_SUBTITLE}**")
         st.markdown("")
         st.info("Please sign in with your school Google account to continue.")
-        if st.button("Sign in with Google", type="primary"):
-            st.login("google")
+        st.link_button("Sign in with Google", custom_auth.login_url(), type="primary")
         st.stop()
-    # Logged in — capture identity
-    user_email = (getattr(st.user, "email", "") or "").lower()
-    user_name_from_auth = getattr(st.user, "name", "") or ""
+    user_email = user["email"]
+    user_name_from_auth = user["name"]
 
 
 # ── Sidebar: identity + status ─────────────────────────────
@@ -353,7 +327,8 @@ with st.sidebar:
     if AUTH_ENABLED and user_email:
         st.markdown(f"**Signed in as**  \n{user_name_from_auth}  \n`{user_email}`")
         if st.button("Sign out", use_container_width=True):
-            st.logout()
+            custom_auth.logout()
+            st.rerun()
         st.divider()
     st.header("Settings")
     debug_mode = st.checkbox("Debug FSP responses", value=False,
@@ -374,17 +349,6 @@ with st.sidebar:
         st.success("Auth: enabled")
     else:
         st.warning("Auth: not configured (anonymous mode)")
-        # Debug: show what we actually see under [auth]
-        try:
-            auth_keys = list(dict(st.secrets.get("auth", {})).keys())
-            st.caption(f"[auth] keys seen: {auth_keys}")
-            # Also check nested
-            for k in auth_keys:
-                v = st.secrets["auth"].get(k)
-                if hasattr(v, "keys"):
-                    st.caption(f"[auth.{k}] sub-keys: {list(dict(v).keys())}")
-        except Exception as _dbg_e:
-            st.caption(f"[auth] debug error: {_dbg_e}")
     st.caption(f"Base: `{config.FSP_BASE_URL}`")
 
 

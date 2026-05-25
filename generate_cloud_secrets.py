@@ -103,6 +103,7 @@ def toml_str(value):
 
 
 REDIRECT_URI = "https://elevation-dispatch.streamlit.app/oauth2callback"
+REDIRECT_URI_BARE = "https://elevation-dispatch.streamlit.app"
 
 out = []
 out.append("# Streamlit Community Cloud secrets — paste this into Settings -> Secrets")
@@ -114,14 +115,10 @@ out.append("")
 out.append(f"GOOGLE_SHEET_ID = {toml_str(sheet_id)}")
 out.append('GOOGLE_SHEET_WORKSHEET = "Dispatches"')
 out.append("")
-out.append("[auth]")
-out.append(f"redirect_uri = {toml_str(REDIRECT_URI)}")
-out.append(f"cookie_secret = {toml_str(cookie_secret)}")
-out.append("")
-out.append("[auth.google]")
+out.append("[google_oauth]")
 out.append(f"client_id = {toml_str(client_id)}")
 out.append(f"client_secret = {toml_str(client_secret)}")
-out.append('server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"')
+out.append(f"redirect_uri = {toml_str(REDIRECT_URI_BARE)}")
 out.append("")
 out.append("[gcp_service_account]")
 for k in ["type", "project_id", "private_key_id", "private_key", "client_email",
