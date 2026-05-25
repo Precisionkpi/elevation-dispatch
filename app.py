@@ -321,7 +321,7 @@ if AUTH_ENABLED:
         st.markdown("")
         st.info("Please sign in with your school Google account to continue.")
         if st.button("Sign in with Google", type="primary"):
-            st.login()
+            st.login("google")
         st.stop()
     # Logged in — capture identity
     user_email = (getattr(st.user, "email", "") or "").lower()

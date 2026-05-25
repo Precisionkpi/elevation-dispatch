@@ -11,12 +11,14 @@ Writes to:
 The output cookie_secret is freshly generated each run; that's fine — only
 needs to be stable per deployment.
 """
-import base64
 import json
 import os
-import secrets
+import secrets as _secrets
 import sys
 from pathlib import Path
+
+# Backwards-compat alias for places below that still say `secrets.`
+secrets = _secrets
 
 HERE = Path(__file__).parent
 
@@ -89,8 +91,8 @@ for k in required:
         fail(f"Service-account JSON missing key: {k}")
 
 
-# 4. Generate a cookie secret
-cookie_secret = base64.urlsafe_b64encode(secrets.token_bytes(48)).decode().rstrip("=")
+# 4. Generate a cookie secret (hex, no special chars)
+cookie_secret = secrets.token_hex(48)
 
 
 # 5. Compose the TOML output
@@ -115,6 +117,8 @@ out.append("")
 out.append("[auth]")
 out.append(f"redirect_uri = {toml_str(REDIRECT_URI)}")
 out.append(f"cookie_secret = {toml_str(cookie_secret)}")
+out.append("")
+out.append("[auth.google]")
 out.append(f"client_id = {toml_str(client_id)}")
 out.append(f"client_secret = {toml_str(client_secret)}")
 out.append('server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"')
