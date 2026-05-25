@@ -199,39 +199,11 @@ st.markdown("""
   .status-warn { background: #fef3c7; color: #92400e; }
   .status-danger { background: #fee2e2; color: #991b1b; }
 
-  /* Hide Streamlit chrome and Community Cloud branding */
-  footer, #MainMenu { visibility: hidden !important; display: none !important; }
+  /* Hide chrome that lives INSIDE the iframe (the parent page's branding
+     can't be hidden from here because Streamlit Cloud wraps the app). */
+  footer, #MainMenu { display: none !important; }
   .stDeployButton { display: none !important; }
-
-  /* "Hosted with Streamlit" badge — class names mutate per release */
-  [class*="viewerBadge"], [class*="ViewerBadge"],
-  [class*="hostedBadge"], [class*="HostedBadge"],
-  a[href*="streamlit.io"], a[href*="share.streamlit.io"] {
-    display: none !important;
-  }
-
-  /* Top-right toolbar (the small purple/grey logo) */
-  div[data-testid="stStatusWidget"],
-  div[data-testid="stToolbar"],
-  div[data-testid="stDecoration"],
-  div[data-testid="stHeader"] [data-testid="stToolbarActions"],
-  header[data-testid="stHeader"] { display: none !important; }
-
-  /* Status icons / spinners injected by the runtime */
-  [class*="StatusWidget"],
-  [class*="ConnectionStatus"] {
-    display: none !important;
-  }
-
-  /* "Created by <username>" attribution on Streamlit Cloud public apps */
-  [class*="appCreator"], [class*="AppCreator"],
-  [class*="createdBy"], [class*="CreatedBy"],
-  [class*="streamlitAppCreator"],
-  [data-testid="appCreatorAvatar"],
-  [data-testid="stAppCreator"],
-  [data-testid="stAttribution"] {
-    display: none !important;
-  }
+  header[data-testid="stHeader"] { background: transparent !important; }
 </style>
 """, unsafe_allow_html=True)
 
