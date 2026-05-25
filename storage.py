@@ -27,15 +27,26 @@ CREATE TABLE IF NOT EXISTS dispatches (
     days_until_inspection TEXT,
     open_squawks TEXT,
     squawks_acknowledged INTEGER,
-    fsp_aircraft_id TEXT
+    fsp_aircraft_id TEXT,
+    student_on_flight TEXT
 );
 """
+
+# Columns added after initial release — applied via ALTER TABLE if missing.
+_MIGRATIONS = {
+    "student_on_flight": "TEXT",
+}
 
 
 def init_db():
     os.makedirs(config.UPLOADS_DIR, exist_ok=True)
     with sqlite3.connect(config.DB_FILE) as conn:
         conn.executescript(DDL)
+        # Idempotent migrations
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(dispatches)").fetchall()}
+        for col, col_type in _MIGRATIONS.items():
+            if col not in existing:
+                conn.execute(f"ALTER TABLE dispatches ADD COLUMN {col} {col_type}")
         conn.commit()
 
 
