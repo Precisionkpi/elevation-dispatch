@@ -338,15 +338,25 @@ class FSPClient:
         return out
 
     def get_next_reservation_for_student(self, user_id, lookahead_days=90):
-        """Return the soonest upcoming reservation for this student, or None."""
+        """Return the soonest reservation that hasn't ended yet, or None.
+
+        A reservation is 'still relevant' if its endTime is in the future,
+        i.e., it's either currently active (started but not finished) or
+        scheduled to start later. This means an 8 AM block that ends at noon
+        is still picked at 8:15 AM (in-window), and a flight that already
+        ended at noon won't be picked at 12:30 PM in favour of a later one.
+        """
         if not user_id:
             return None
-        today = date.today()
-        start = datetime.combine(today, datetime.min.time())
-        end = datetime.combine(today + timedelta(days=lookahead_days), datetime.min.time())
+        now = datetime.utcnow()
+        # Generous start window (1 week back) to be sure currently-active
+        # reservations with early start times are included.
+        start_window = datetime.combine(
+            date.today() - timedelta(days=7), datetime.min.time()
+        )
         params = {
-            "startTimeUtc": f"Gte:{start.strftime('%Y-%m-%dT%H:%M:%SZ')}",
-            "endTimeUtc": f"Lte:{end.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+            "startTimeUtc": f"Gte:{start_window.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+            "endTimeUtc": f"Gte:{now.strftime('%Y-%m-%dT%H:%M:%SZ')}",
             "userId": f"eq:{user_id}",
             "limit": 100,
         }
@@ -359,10 +369,15 @@ class FSPClient:
         except FSPError:
             return None
         items = self._items(data)
-        # Sort by local start time, take soonest
+        # Sort by local start time, take soonest non-ended
         items.sort(key=lambda r: r.get("startTime") or "9999")
+        # Cap lookahead client-side too
+        cutoff = (date.today() + timedelta(days=lookahead_days)).isoformat()
         for r in items:
             if not isinstance(r, dict):
+                continue
+            local_start = (r.get("startTime") or "")[:10]
+            if local_start and local_start > cutoff:
                 continue
             return self._normalize_reservation(r)
         return None
