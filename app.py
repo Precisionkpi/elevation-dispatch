@@ -793,10 +793,12 @@ if st.button("Submit Dispatch", type="primary"):
                     return "application/pdf"
                 return "application/octet-stream"
 
-            # Only attempt the upload if the Apps Script bridge is configured
-            # (direct service-account upload doesn't work on personal Google
-            # accounts — see SETUP.md).
-            upload_configured = bool(config.APPS_SCRIPT_UPLOAD_URL)
+            # Attempt upload if either route is configured (Apps Script bridge
+            # OR a Shared Drive folder where the service account is a member).
+            upload_configured = bool(
+                config.APPS_SCRIPT_UPLOAD_URL or config.GOOGLE_DRIVE_FOLDER_ID
+            )
+            upload_errors = []
             if upload_configured:
                 with st.spinner("Uploading attachments..."):
                     if wb_file:
@@ -806,9 +808,8 @@ if st.button("Submit Dispatch", type="primary"):
                                 f"dispatch-{dispatch_id}-wb-{wb_file.name}",
                                 _mime(wb_file.name),
                             )
-                        except Exception:
-                            # Quietly fall back to filename-only
-                            pass
+                        except Exception as e:
+                            upload_errors.append(f"W&B: {str(e)[:140]}")
                     if weather_file:
                         try:
                             weather_url = sheets_storage.upload_to_drive(
@@ -816,8 +817,10 @@ if st.button("Submit Dispatch", type="primary"):
                                 f"dispatch-{dispatch_id}-weather-{weather_file.name}",
                                 _mime(weather_file.name),
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            upload_errors.append(f"Weather: {str(e)[:140]}")
+            for ue in upload_errors:
+                st.info(f"Image upload skipped — {ue}")
 
             try:
                 sheets_storage.append_dispatch(
