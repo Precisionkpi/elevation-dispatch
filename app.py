@@ -222,6 +222,16 @@ st.markdown("""
   [class*="ConnectionStatus"] {
     display: none !important;
   }
+
+  /* "Created by <username>" attribution on Streamlit Cloud public apps */
+  [class*="appCreator"], [class*="AppCreator"],
+  [class*="createdBy"], [class*="CreatedBy"],
+  [class*="streamlitAppCreator"],
+  [data-testid="appCreatorAvatar"],
+  [data-testid="stAppCreator"],
+  [data-testid="stAttribution"] {
+    display: none !important;
+  }
 </style>
 """, unsafe_allow_html=True)
 
