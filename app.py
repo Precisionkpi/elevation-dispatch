@@ -492,6 +492,19 @@ if reservation and reservation.get("start_time"):
         pass
 block_time = st.time_input("Block Time *", value=default_block, help="Flight start time")
 
+# ── Student (only shown when an Instructor is signed in) ───
+student_on_flight = ""
+if matched_role := (selected_student or {}).get("primary_role"):
+    if matched_role == "Instructor":
+        default_student = ""
+        if reservation and reservation.get("pilot_names"):
+            default_student = ", ".join(reservation["pilot_names"])
+        student_on_flight = st.text_input(
+            "Student (flying with)",
+            value=default_student,
+            help="Auto-filled from your FSP reservation's assigned student. Leave blank for solo / personal time.",
+        )
+
 # ── Instructor (default from reservation) ──────────────────
 NO_INSTRUCTOR = "N/A-Solo"
 if instructor_list:
@@ -777,6 +790,7 @@ if st.button("Submit Dispatch", type="primary"):
             ]),
             "squawks_acknowledged": int(squawks_ack),
             "fsp_aircraft_id": selected_aircraft_id or "",
+            "student_on_flight": student_on_flight.strip() if student_on_flight else "",
         }
         dispatch_id = storage.save_dispatch(record)
         wb_path = storage.save_upload(dispatch_id, "wb", wb_file)
