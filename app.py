@@ -289,9 +289,23 @@ def _days_status(days):
 
 # ── AUTH GATE (Google OAuth via st.login) ──────────────────
 def _auth_enabled():
-    """Auth is required when [auth] secrets are configured."""
+    """Auth is required when [auth] secrets are configured.
+
+    Accepts both flat single-provider ([auth] with client_id) and
+    multi-provider ([auth.google] with client_id, [auth] with redirect_uri
+    and cookie_secret) formats.
+    """
     try:
-        return bool(st.secrets.get("auth", {}).get("client_id"))
+        auth = st.secrets.get("auth", {})
+        if not auth:
+            return False
+        if auth.get("client_id"):
+            return True
+        # Multi-provider: any [auth.<provider>] with client_id
+        for key, val in dict(auth).items():
+            if isinstance(val, dict) and val.get("client_id"):
+                return True
+        return False
     except Exception:
         return False
 
