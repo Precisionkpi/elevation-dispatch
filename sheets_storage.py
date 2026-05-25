@@ -81,35 +81,32 @@ def _drive_service():
 
 
 def upload_to_drive(file_bytes: bytes, filename: str, mimetype: str = "application/octet-stream") -> str:
-    """Upload bytes to a Drive folder shared with the service account.
+    """Upload bytes to Drive via Apps Script bridge (preferred) or direct API.
 
-    Requires GOOGLE_DRIVE_FOLDER_ID to be set — the service account itself has
-    no personal storage quota, so files must be created inside a folder owned
-    by a real user that has been shared with the service account as Editor.
+    Apps Script bridge bypasses Google's restriction that service accounts have
+    no personal storage quota — the script runs as the user who deployed it.
+    Configure APPS_SCRIPT_UPLOAD_URL in secrets and follow SETUP.md to deploy
+    the script.
     """
-    if not config.GOOGLE_DRIVE_FOLDER_ID:
-        raise RuntimeError(
-            "GOOGLE_DRIVE_FOLDER_ID is not set. Create a folder in your Drive, "
-            "share it with the service account email as Editor, and add the "
-            "folder ID to secrets."
-        )
+    if config.APPS_SCRIPT_UPLOAD_URL:
+        return _upload_via_apps_script(file_bytes, filename, mimetype)
 
+    if not config.GOOGLE_DRIVE_FOLDER_ID:
+        raise RuntimeError("No upload destination configured.")
+
+    # Direct Drive API path (will fail without a Shared Drive on free Workspace)
     import io
     from googleapiclient.http import MediaIoBaseUpload
 
     service = _drive_service()
     media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=mimetype, resumable=False)
     created = service.files().create(
-        body={
-            "name": filename,
-            "parents": [config.GOOGLE_DRIVE_FOLDER_ID],
-        },
+        body={"name": filename, "parents": [config.GOOGLE_DRIVE_FOLDER_ID]},
         media_body=media,
         fields="id, webViewLink",
         supportsAllDrives=True,
     ).execute()
     file_id = created["id"]
-    # Make readable by anyone with the link
     try:
         service.permissions().create(
             fileId=file_id,
@@ -118,10 +115,36 @@ def upload_to_drive(file_bytes: bytes, filename: str, mimetype: str = "applicati
             supportsAllDrives=True,
         ).execute()
     except Exception:
-        # If we can't set link-sharing (Workspace restriction), file is still in
-        # the folder which the user owns and can access. Skip silently.
         pass
     return created.get("webViewLink") or f"https://drive.google.com/file/d/{file_id}/view"
+
+
+def _upload_via_apps_script(file_bytes: bytes, filename: str, mimetype: str) -> str:
+    """POST the file (base64-encoded) to the Apps Script bridge, get a Drive URL back."""
+    import base64
+    import requests
+
+    payload = {
+        "filename": filename,
+        "mimetype": mimetype,
+        "folderId": config.GOOGLE_DRIVE_FOLDER_ID,
+        "content_b64": base64.b64encode(file_bytes).decode("ascii"),
+    }
+    r = requests.post(
+        config.APPS_SCRIPT_UPLOAD_URL, json=payload, timeout=30,
+    )
+    if not r.ok:
+        raise RuntimeError(f"Apps Script returned {r.status_code}: {r.text[:200]}")
+    try:
+        data = r.json()
+    except ValueError as e:
+        raise RuntimeError(f"Apps Script returned non-JSON: {r.text[:200]}") from e
+    if data.get("error"):
+        raise RuntimeError(f"Apps Script error: {data['error']}")
+    url = data.get("url")
+    if not url:
+        raise RuntimeError(f"Apps Script returned no URL: {data}")
+    return url
 
 
 def _hyperlink(url: str, label: str) -> str:

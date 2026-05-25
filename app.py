@@ -770,25 +770,31 @@ if st.button("Submit Dispatch", type="primary"):
                     return "application/pdf"
                 return "application/octet-stream"
 
-            with st.spinner("Uploading attachments..."):
-                if wb_file:
-                    try:
-                        wb_url = sheets_storage.upload_to_drive(
-                            wb_file.getvalue(),
-                            f"dispatch-{dispatch_id}-wb-{wb_file.name}",
-                            _mime(wb_file.name),
-                        )
-                    except Exception as e:
-                        st.warning(f"W&B Drive upload failed: {e}")
-                if weather_file:
-                    try:
-                        weather_url = sheets_storage.upload_to_drive(
-                            weather_file.getvalue(),
-                            f"dispatch-{dispatch_id}-weather-{weather_file.name}",
-                            _mime(weather_file.name),
-                        )
-                    except Exception as e:
-                        st.warning(f"Weather Drive upload failed: {e}")
+            # Only attempt the upload if the Apps Script bridge is configured
+            # (direct service-account upload doesn't work on personal Google
+            # accounts — see SETUP.md).
+            upload_configured = bool(config.APPS_SCRIPT_UPLOAD_URL)
+            if upload_configured:
+                with st.spinner("Uploading attachments..."):
+                    if wb_file:
+                        try:
+                            wb_url = sheets_storage.upload_to_drive(
+                                wb_file.getvalue(),
+                                f"dispatch-{dispatch_id}-wb-{wb_file.name}",
+                                _mime(wb_file.name),
+                            )
+                        except Exception:
+                            # Quietly fall back to filename-only
+                            pass
+                    if weather_file:
+                        try:
+                            weather_url = sheets_storage.upload_to_drive(
+                                weather_file.getvalue(),
+                                f"dispatch-{dispatch_id}-weather-{weather_file.name}",
+                                _mime(weather_file.name),
+                            )
+                        except Exception:
+                            pass
 
             try:
                 sheets_storage.append_dispatch(
