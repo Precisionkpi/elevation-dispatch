@@ -368,6 +368,17 @@ with st.sidebar:
         st.success("Auth: enabled")
     else:
         st.warning("Auth: not configured (anonymous mode)")
+        # Debug: show what we actually see under [auth]
+        try:
+            auth_keys = list(dict(st.secrets.get("auth", {})).keys())
+            st.caption(f"[auth] keys seen: {auth_keys}")
+            # Also check nested
+            for k in auth_keys:
+                v = st.secrets["auth"].get(k)
+                if hasattr(v, "keys"):
+                    st.caption(f"[auth.{k}] sub-keys: {list(dict(v).keys())}")
+        except Exception as _dbg_e:
+            st.caption(f"[auth] debug error: {_dbg_e}")
     st.caption(f"Base: `{config.FSP_BASE_URL}`")
 
 
