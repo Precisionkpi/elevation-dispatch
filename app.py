@@ -634,19 +634,21 @@ _section("Pre-flight Briefing")
 # ── Remaining form fields ──────────────────────────────────
 flight_type = st.radio("Flight Type *", options=config.FLIGHT_TYPES, index=None)
 
-# Route of Flight — student must actively check Practice Area or type a route.
-# Forces a conscious choice every flight rather than leaving Practice Area on
-# autopilot.
-practice_area = st.checkbox(
-    "Practice Area (check to auto-fill, or type a route below)",
-    value=False,
+# Route of Flight — single title with the Practice Area checkbox and optional
+# free-text field grouped underneath.
+st.markdown(
+    '<div style="font-weight:600;color:#0c2340;font-size:0.92rem;'
+    'margin:0.5rem 0 0.25rem 0">Route of Flight *</div>',
+    unsafe_allow_html=True,
 )
+practice_area = st.checkbox("Practice Area", value=False)
 if practice_area:
     route = "Practice Area"
 else:
     route = st.text_input(
-        "Route of Flight *",
+        "route_typed",
         placeholder="e.g. KHEF KCJR KHEF",
+        label_visibility="collapsed",
         help="Type the route, or check the Practice Area box above.",
     )
 
