@@ -327,34 +327,14 @@ if AUTH_ENABLED:
     user_name_from_auth = user["name"]
 
 
-# ── Sidebar: identity + status ─────────────────────────────
+# ── Sidebar ────────────────────────────────────────────────
+debug_mode = False  # debug expander hidden in production
 with st.sidebar:
     if AUTH_ENABLED and user_email:
         st.markdown(f"**Signed in as**  \n{user_name_from_auth}  \n`{user_email}`")
         if st.button("Sign out", use_container_width=True):
             custom_auth.logout()
             st.rerun()
-        st.divider()
-    st.header("Settings")
-    debug_mode = st.checkbox("Debug FSP responses", value=False,
-                             help="Show raw API responses to help diagnose endpoint shapes")
-    if config.FSP_API_KEY:
-        st.success("FSP key loaded")
-    else:
-        st.error("FSP_API_KEY missing")
-    if config.FSP_OPERATOR_ID:
-        st.success(f"Operator: {config.FSP_OPERATOR_ID}")
-    else:
-        st.error("FSP_OPERATOR_ID missing")
-    if sheets_storage.enabled():
-        st.success("Google Sheet: connected")
-    elif config.GOOGLE_SHEET_ID:
-        st.warning("Sheet ID set but service account missing")
-    if AUTH_ENABLED:
-        st.success("Auth: enabled")
-    else:
-        st.warning("Auth: not configured (anonymous mode)")
-    st.caption(f"Base: `{config.FSP_BASE_URL}`")
 
 
 # ── Header ─────────────────────────────────────────────────
