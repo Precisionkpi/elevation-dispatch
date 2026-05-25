@@ -282,15 +282,17 @@ def _stat_block(label, value, detail=None, status="ok"):
 
 
 def _hours_status(hours):
+    """Tach hours remaining: red < 5, orange < 10, else green."""
     if hours is None:
         return "ok"
-    return "danger" if hours < 10 else "warn" if hours < 25 else "ok"
+    return "danger" if hours < 5 else "warn" if hours < 10 else "ok"
 
 
 def _days_status(days):
+    """Days until inspection: red < 3, orange < 14, else green."""
     if days is None:
         return "ok"
-    return "danger" if days < 7 else "warn" if days < 30 else "ok"
+    return "danger" if days < 3 else "warn" if days < 14 else "ok"
 
 
 # ── AUTH GATE (custom Google OAuth — bypasses st.login) ───
