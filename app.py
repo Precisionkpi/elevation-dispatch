@@ -364,6 +364,10 @@ with st.sidebar:
         st.success("Google Sheet: connected")
     elif config.GOOGLE_SHEET_ID:
         st.warning("Sheet ID set but service account missing")
+    if AUTH_ENABLED:
+        st.success("Auth: enabled")
+    else:
+        st.warning("Auth: not configured (anonymous mode)")
     st.caption(f"Base: `{config.FSP_BASE_URL}`")
 
 
