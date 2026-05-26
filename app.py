@@ -390,11 +390,14 @@ _section("Pilot & Date")
 selected_student = None
 name = ""
 if AUTH_ENABLED:
-    # Match logged-in Google email to an FSP student record
+    # Match logged-in Google email to an FSP person record. Apply any alias
+    # from secrets first (lets people log in with one email and match against
+    # a different email in FSP).
+    lookup_email = config.EMAIL_ALIASES.get(user_email, user_email)
     matched = None
-    if student_list and user_email:
+    if student_list and lookup_email:
         matched = next(
-            (s for s in student_list if (s.get("email") or "").lower() == user_email),
+            (s for s in student_list if (s.get("email") or "").lower() == lookup_email),
             None,
         )
     if matched:
@@ -409,10 +412,10 @@ if AUTH_ENABLED:
         )
     else:
         st.error(
-            f"Hi {user_name_from_auth or user_email}! Your Google account email "
-            f"**{user_email}** is not registered in Flight Schedule Pro under a "
-            "flying role (Student, Instructor, Renter, or Owner). Please contact "
-            "the school admin to be added."
+            f"Hi {user_name_from_auth or user_email}! Your Google login email "
+            f"**{user_email}** isn't matching any FSP record. Two fixes:\n\n"
+            f"1. Update your FSP profile email to **{user_email}** (easiest), or\n"
+            f"2. Sign in with the Google account that matches your FSP email."
         )
         st.stop()
 elif student_list:

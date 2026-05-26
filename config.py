@@ -76,6 +76,25 @@ UPLOADS_DIR = _get("UPLOADS_DIR", os.path.join(_HERE, "uploads"))
 # Optional access control (comma-separated emails). Empty = no auth.
 ALLOWED_EMAILS = _csv(_get("ALLOWED_EMAILS", ""))
 
+
+def _get_email_aliases():
+    """Return {google_login_email: fsp_email} mapping from secrets [email_aliases].
+
+    Lets people sign in with a Google email that differs from what FSP has,
+    by pointing the login email at their FSP-known email."""
+    if not _HAVE_STREAMLIT:
+        return {}
+    try:
+        aliases = st.secrets.get("email_aliases", None)
+        if aliases is None:
+            return {}
+        return {str(k).lower(): str(v).lower() for k, v in dict(aliases).items()}
+    except Exception:
+        return {}
+
+
+EMAIL_ALIASES = _get_email_aliases()
+
 # Form options
 FLIGHT_TYPES = ["Dual Local", "Dual XC", "Local Solo", "XC Solo", "Rental"]
 FLIGHT_PLAN_OPTIONS = ["Yes", "N/A - HEF Patterns"]
