@@ -226,6 +226,21 @@ class FSPClient:
         out.sort(key=lambda s: (not s["ground_aircraft"], s.get("reported_date") or ""))
         return out
 
+    def list_active_user_ids(self):
+        """Return the set of userIds with status='Active' from /users."""
+        data = self._get(
+            f"operators/{self.operator_id}/users",
+            params={"limit": 500},
+        )
+        active = set()
+        for u in self._items(data):
+            if not isinstance(u, dict):
+                continue
+            status_name = (u.get("status") or {}).get("name") if isinstance(u.get("status"), dict) else None
+            if status_name == "Active":
+                active.add(u.get("userId"))
+        return active
+
     # ── Pilots (anyone who can fill out a dispatch) ────────
     def list_pilots(self, allowed_roles=(
         "Students", "Instructors", "Administrator", "Renters", "Owners",
@@ -241,6 +256,11 @@ class FSPClient:
             f"operators/{self.operator_id}/people",
             params={"limit": 500},
         )
+        # Cross-reference with /users to skip Inactive / Deleted accounts
+        try:
+            active_ids = self.list_active_user_ids()
+        except FSPError:
+            active_ids = None  # fall back to no filtering if /users fails
         allowed = set(allowed_roles)
         # Map FSP role name -> the label we show. Both Instructor & Administrator
         # map to "Instructor" so admins get the instructor experience.
@@ -257,6 +277,10 @@ class FSPClient:
         for p in self._items(data):
             if not isinstance(p, dict):
                 continue
+            uid = p.get("userGuidId")
+            # Skip if /users says this person is Inactive / Deleted
+            if active_ids is not None and uid and uid not in active_ids:
+                continue
             role_names = {(r or {}).get("name") for r in (p.get("roles") or []) if r}
             flying_roles = role_names & allowed
             if not flying_roles:
@@ -269,7 +293,7 @@ class FSPClient:
                 "Pilot",
             )
             out.append({
-                "id": p.get("userGuidId"),
+                "id": uid,
                 "name": name,
                 "email": p.get("email"),
                 "phone": p.get("phone"),
@@ -464,7 +488,8 @@ class FSPClient:
             if not isinstance(u, dict):
                 continue
             status_name = self._nested_name(u, "instructorStatus")
-            if status_name == "Deleted":
+            # Skip Deleted AND Inactive — only show currently-flying instructors
+            if status_name in ("Deleted", "Inactive"):
                 continue
             first = u.get("firstName") or ""
             last = u.get("lastName") or ""

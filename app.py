@@ -713,35 +713,26 @@ flight_plans = st.radio("Exit and return flight plans filed? *",
 
 _section("Maintenance Confirmation")
 
-# Auto-fill tach/inspection numbers from FSP if available
-default_tach = ""
-default_days = ""
-if maint:
-    if maint.get("tach_until_mx"):
-        default_tach = f"{maint['tach_until_mx'][1]:.1f}"
-    if maint.get("days_until_inspection"):
-        default_days = str(maint["days_until_inspection"][1])
-
-# Tach until MX — stat block + confirmation input
+# Tach until MX — stat block above, blank input below (pilot must type it)
 if maint and maint.get("tach_until_mx"):
     name_t, hours_t = maint["tach_until_mx"]
     _stat_block("Tach until MX (from FSP)", f"{hours_t:.1f} hrs", name_t, _hours_status(hours_t))
     st.markdown("")
 tach_until_mx = st.text_input(
     "Tach hours until next MX *",
-    value=default_tach,
-    help="Use whatever MX action is soonest measured by tach time (auto-filled from FSP when aircraft selected).",
+    value="",
+    help="Reference the FSP value shown above and type it in here (forces a conscious check).",
 )
 
-# Days until Inspection — stat block + confirmation input
+# Days until Inspection — same pattern
 if maint and maint.get("days_until_inspection"):
     name_d, days_d = maint["days_until_inspection"]
     _stat_block("Days until Inspection (from FSP)", f"{days_d} days", name_d, _days_status(days_d))
     st.markdown("")
 days_until_inspection = st.text_input(
     "Days until next Inspection *",
-    value=default_days,
-    help="Use whatever Inspection is soonest based on date (auto-filled from FSP when aircraft selected).",
+    value="",
+    help="Reference the FSP value shown above and type it in here (forces a conscious check).",
 )
 
 squawks_ack = False
