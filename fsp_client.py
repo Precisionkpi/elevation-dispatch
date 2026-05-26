@@ -227,18 +227,32 @@ class FSPClient:
         return out
 
     # ── Pilots (anyone who can fill out a dispatch) ────────
-    def list_pilots(self, allowed_roles=("Students", "Instructors", "Renters", "Owners")):
-        """Return all people who could file a dispatch: students, instructors,
-        renters, owners. Filtered client-side from /people (server-side role
-        filter on /people is silently ignored)."""
+    def list_pilots(self, allowed_roles=(
+        "Students", "Instructors", "Administrator", "Renters", "Owners",
+    )):
+        """Return all people who could file a dispatch.
+
+        Administrators are treated as Instructors (most school admins are also
+        CFIs and need the instructor workflow — 'Flying with' field, etc.).
+        Filtered client-side from /people (server-side role filter is
+        silently ignored).
+        """
         data = self._get(
             f"operators/{self.operator_id}/people",
             params={"limit": 500},
         )
         allowed = set(allowed_roles)
-        # Prefer Instructor > Student > Renter > Owner when tagging primary role
-        priority = {"Instructors": "Instructor", "Students": "Student",
-                    "Renters": "Renter", "Owners": "Owner"}
+        # Map FSP role name -> the label we show. Both Instructor & Administrator
+        # map to "Instructor" so admins get the instructor experience.
+        role_label = {
+            "Instructors": "Instructor",
+            "Administrator": "Instructor",
+            "Students": "Student",
+            "Renters": "Renter",
+            "Owners": "Owner",
+        }
+        # Priority for picking the displayed role when a person has multiple.
+        priority_order = ("Instructors", "Administrator", "Students", "Renters", "Owners")
         out = []
         for p in self._items(data):
             if not isinstance(p, dict):
@@ -250,10 +264,8 @@ class FSPClient:
             first = p.get("firstName") or ""
             last = p.get("lastName") or ""
             name = f"{first} {last}".strip() or p.get("email") or "?"
-            # Pick the highest-priority role to display
             primary_role = next(
-                (priority[r] for r in ("Instructors", "Students", "Renters", "Owners")
-                 if r in flying_roles),
+                (role_label[r] for r in priority_order if r in flying_roles),
                 "Pilot",
             )
             out.append({
