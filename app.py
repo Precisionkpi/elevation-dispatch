@@ -80,16 +80,16 @@ st.markdown("""
   h1::after {
     content: "";
     display: inline-block;
-    width: 0.7em;
-    height: 0.7em;
-    margin-left: 0.4em;
+    width: 0.85em;
+    height: 0.85em;
+    margin-left: 0.5em;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239bd5f5'><path d='M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z'/></svg>");
     background-repeat: no-repeat;
     background-size: contain;
     background-position: center;
     vertical-align: middle;
     transform: rotate(45deg);
-    opacity: 0.7;
+    opacity: 0.25;
   }
 
   /* Subtitle / hint text */
