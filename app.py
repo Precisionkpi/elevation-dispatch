@@ -19,47 +19,54 @@ from fsp_client import FSPClient, FSPError
 st.set_page_config(page_title=f"{config.COMPANY_NAME} Dispatch", page_icon="airplane", layout="centered")
 
 
-# ── Custom CSS — matches elevationflight.com branding ──────
+# ── Custom CSS — dark theme matching elevationflight.com ───
 st.markdown("""
 <style>
-  /* Brand fonts */
-  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Fraunces:wght@500;700&display=swap');
+  /* Brand font */
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
 
   html, body, [class^="css"], [class*=" css"] {
     font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
   }
 
-  /* Cream page background with subtle gradient (Elevation Flight palette) */
+  /* Dark page background with subtle sky-blue glow */
   [data-testid="stAppViewContainer"] {
     background:
-      radial-gradient(ellipse 900px 500px at 20% 15%, rgba(155, 213, 245, 0.18) 0%, transparent 60%),
-      radial-gradient(ellipse 700px 400px at 90% 85%, rgba(27, 103, 159, 0.06) 0%, transparent 60%),
-      linear-gradient(180deg, #fbfaf7 0%, #f5f3ec 100%);
+      radial-gradient(ellipse 1000px 600px at 20% 10%, rgba(74, 154, 219, 0.10) 0%, transparent 60%),
+      radial-gradient(ellipse 800px 500px at 90% 90%, rgba(27, 103, 159, 0.08) 0%, transparent 60%),
+      linear-gradient(180deg, #0b0d11 0%, #111318 100%);
     background-attachment: fixed;
+    color: #f5f3ec;
   }
 
-  /* Main form container as a clean card */
+  /* Main form container as an elevated dark card */
   .block-container {
     padding-top: 4.5rem;
     padding-bottom: 4rem;
     max-width: 780px;
   }
   .block-container > div:first-child {
-    background: #ffffff;
+    background: #1a1d23;
     border-radius: 16px;
     padding: 28px 36px 32px 36px;
-    box-shadow: 0 8px 30px rgba(17, 19, 24, 0.06), 0 2px 6px rgba(17, 19, 24, 0.03);
-    border: 1px solid rgba(17, 19, 24, 0.06);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
-  /* Logo block */
+  /* Logo block — invert the dark logo so it shows in cream on dark */
   .logo-wrap {
     text-align: center;
     padding: 8px 0 16px 0;
     position: relative;
   }
-  .logo-wrap img { max-width: 380px; width: 85%; height: auto; }
-  /* Subtle airplane silhouette top-right */
+  .logo-wrap img {
+    max-width: 380px;
+    width: 85%;
+    height: auto;
+    filter: invert(1) brightness(1.05);
+    mix-blend-mode: screen;
+  }
+  /* Faint airplane silhouette top-right */
   .logo-wrap::after {
     content: "";
     position: absolute;
@@ -67,31 +74,34 @@ st.markdown("""
     right: 0;
     width: 56px;
     height: 56px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231a1d23'><path d='M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z'/></svg>");
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239bd5f5'><path d='M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z'/></svg>");
     background-repeat: no-repeat;
     background-size: contain;
-    opacity: 0.12;
+    opacity: 0.20;
     transform: rotate(45deg);
   }
 
-  /* Title — dark slate, serif accent feel via tight tracking */
+  /* Title — cream text */
   h1 {
-    color: #1a1d23 !important;
+    color: #fbfaf7 !important;
     font-weight: 800 !important;
     letter-spacing: -0.02em !important;
   }
 
-  /* Section header with brand-blue accent bar */
+  /* Subtitle / hint text */
+  h1 + div p strong { color: #d2ecfc; font-weight: 500; }
+
+  /* Section header with sky-blue accent bar */
   .section-header {
     position: relative;
     font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.14em;
-    color: #1a1d23;
+    color: #9bd5f5;
     text-transform: uppercase;
     margin: 2rem 0 1rem 0;
     padding-left: 14px;
-    border-bottom: 1px solid #e6e3d8;
+    border-bottom: 1px solid rgba(155, 213, 245, 0.15);
     padding-bottom: 6px;
   }
   .section-header::before {
@@ -101,81 +111,92 @@ st.markdown("""
     top: 2px;
     bottom: 8px;
     width: 4px;
-    background: linear-gradient(180deg, #4a9adb, #1b679f);
+    background: linear-gradient(180deg, #9bd5f5, #1b679f);
     border-radius: 3px;
   }
 
   /* Form labels */
   label[data-testid="stWidgetLabel"] p {
     font-weight: 600;
-    color: #1a1d23;
+    color: #f5f3ec;
     font-size: 0.92rem;
   }
 
-  /* Inputs */
+  /* Inputs — dark with subtle border */
   div[data-baseweb="input"] > div,
   div[data-baseweb="select"] > div,
   div[data-baseweb="textarea"] > div {
     border-radius: 10px !important;
-    border: 1px solid #e6e3d8 !important;
-    background: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    background: #262a32 !important;
+    color: #f5f3ec !important;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   div[data-baseweb="input"]:focus-within > div,
   div[data-baseweb="select"]:focus-within > div {
-    border-color: #1b679f !important;
-    box-shadow: 0 0 0 3px rgba(27, 103, 159, 0.12) !important;
+    border-color: #4a9adb !important;
+    box-shadow: 0 0 0 3px rgba(74, 154, 219, 0.18) !important;
   }
+  /* Input text */
+  div[data-baseweb="input"] input,
+  div[data-baseweb="select"] input { color: #f5f3ec !important; }
 
   /* File uploader */
   [data-testid="stFileUploader"] section {
     border-radius: 10px;
-    border: 2px dashed #c8e0ef;
-    background: #fbfaf7;
+    border: 2px dashed rgba(155, 213, 245, 0.25);
+    background: #1f232a;
   }
   [data-testid="stFileUploader"] section:hover {
-    border-color: #1b679f;
-    background: #f5f3ec;
+    border-color: #4a9adb;
+    background: #262a32;
   }
 
-  /* Primary button — brand dark slate */
+  /* Primary button — sky-blue gradient (like website's CONTACT button) */
   div[data-testid="stButton"] > button[kind="primary"] {
     width: 100%;
     border-radius: 12px;
     padding: 0.9rem 2rem;
     font-weight: 700;
     font-size: 1.02rem;
-    background: linear-gradient(135deg, #1a1d23 0%, #2f3742 100%) !important;
+    background: linear-gradient(135deg, #6eb8ec 0%, #1b679f 100%) !important;
     border: none !important;
-    color: #fbfaf7 !important;
-    box-shadow: 0 4px 14px rgba(17, 19, 24, 0.25);
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(27, 103, 159, 0.40);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
   div[data-testid="stButton"] > button[kind="primary"]:hover {
     transform: translateY(-1px);
-    box-shadow: 0 8px 22px rgba(17, 19, 24, 0.35);
+    box-shadow: 0 8px 22px rgba(27, 103, 159, 0.55);
   }
 
-  /* Alerts */
+  /* Secondary buttons */
+  div[data-testid="stButton"] > button:not([kind="primary"]) {
+    background: #262a32 !important;
+    color: #f5f3ec !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  }
+
+  /* Alerts — dark variants */
   div[data-testid="stAlert"] { border-radius: 10px; }
 
-  /* Stat block — cream + sky accent */
+  /* Stat block — dark with sky accent label */
   .stat {
     padding: 14px 16px;
     border-radius: 12px;
-    background: linear-gradient(135deg, #ffffff 0%, #f7fbff 100%);
-    border: 1px solid #e6e3d8;
-    box-shadow: 0 2px 6px rgba(17, 19, 24, 0.04);
+    background: linear-gradient(135deg, #1f232a 0%, #262a32 100%);
+    border: 1px solid rgba(155, 213, 245, 0.12);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.30);
     min-height: 100px;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
   .stat:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 14px rgba(17, 19, 24, 0.08);
+    box-shadow: 0 6px 14px rgba(27, 103, 159, 0.30);
   }
   .stat-label {
     font-size: 0.72rem;
-    color: #1b679f;
+    color: #9bd5f5;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -183,34 +204,34 @@ st.markdown("""
   .stat-value {
     font-size: 1.7rem;
     font-weight: 800;
-    color: #1a1d23;
+    color: #fbfaf7;
     line-height: 1.2;
     margin-top: 6px;
   }
-  .stat-value.ok { color: #16a34a; }
-  .stat-value.warn { color: #d97706; }
-  .stat-value.danger { color: #dc2626; }
+  .stat-value.ok { color: #4ade80; }
+  .stat-value.warn { color: #fbbf24; }
+  .stat-value.danger { color: #f87171; }
   .stat-detail {
     font-size: 0.76rem;
-    color: #7a7f87;
+    color: #9ca3af;
     margin-top: 4px;
     white-space: normal;
   }
 
-  /* Identity banner */
+  /* Identity banner — sky-blue gradient (matches website's CONTACT) */
   .ac-banner {
-    background: linear-gradient(135deg, #1a1d23, #2f3742);
-    color: #fbfaf7;
+    background: linear-gradient(135deg, #1b679f, #0c1629);
+    color: #ffffff;
     padding: 16px 22px;
     border-radius: 12px;
     margin: 6px 0 14px 0;
-    box-shadow: 0 4px 14px rgba(17, 19, 24, 0.18);
+    box-shadow: 0 4px 14px rgba(27, 103, 159, 0.30);
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
   .ac-banner .ac-tail { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; }
-  .ac-banner .ac-model { font-size: 0.92rem; opacity: 0.8; margin-top: 2px; }
+  .ac-banner .ac-model { font-size: 0.92rem; opacity: 0.85; margin-top: 2px; }
   .ac-banner .ac-status {
     background: rgba(155, 213, 245, 0.25);
     color: #d2ecfc;
@@ -230,9 +251,15 @@ st.markdown("""
     font-weight: 600;
     margin-left: 8px;
   }
-  .status-ok { background: #def7e5; color: #1a7a3a; }
-  .status-warn { background: #fef3c7; color: #92400e; }
-  .status-danger { background: #fee2e2; color: #991b1b; }
+  .status-ok { background: rgba(74, 222, 128, 0.18); color: #4ade80; }
+  .status-warn { background: rgba(251, 191, 36, 0.18); color: #fbbf24; }
+  .status-danger { background: rgba(248, 113, 113, 0.18); color: #f87171; }
+
+  /* Sidebar */
+  [data-testid="stSidebar"] { background: #0c1629 !important; }
+
+  /* Dividers */
+  hr { border-color: rgba(255, 255, 255, 0.08) !important; }
 
   /* Hide chrome inside the iframe */
   footer, #MainMenu { display: none !important; }
