@@ -80,10 +80,20 @@ st.markdown("""
     opacity: 0.15;
     transform: rotate(45deg);
   }
-  /* On phones the airplane overlaps the logo — just hide it */
+  /* On phones, reposition the airplane below the logo and shrink it so it
+     doesn't collide. */
   @media (max-width: 640px) {
-    .logo-wrap::after { display: none; }
-    .logo-wrap img { width: 90%; }
+    .logo-wrap {
+      padding-bottom: 36px;
+    }
+    .logo-wrap::after {
+      top: auto;
+      bottom: 0;
+      right: 8px;
+      width: 32px;
+      height: 32px;
+    }
+    .logo-wrap img { width: 88%; }
     .block-container > div:first-child { padding: 20px 18px 24px 18px; }
   }
 
