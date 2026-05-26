@@ -73,23 +73,8 @@ st.markdown("""
   /* On phones: smaller watermark, nudged slightly lower so it sits in
      line with the logo (not the very top corner) */
   @media (max-width: 640px) {
-    /* Hide the corner watermark on mobile */
+    /* No watermark on mobile — keep things clean on narrow screens */
     .block-container > div:first-child::before { display: none; }
-    /* Small airplane centered below the logo as a subtle divider */
-    .logo-wrap { padding-bottom: 30px; }
-    .logo-wrap::after {
-      content: "";
-      position: absolute;
-      bottom: 4px;
-      left: 50%;
-      transform: translateX(-50%) rotate(45deg);
-      width: 24px;
-      height: 24px;
-      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239bd5f5'><path d='M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z'/></svg>");
-      background-repeat: no-repeat;
-      background-size: contain;
-      opacity: 0.4;
-    }
   }
 
   /* Logo block — invert the dark logo so it shows in cream on dark */
