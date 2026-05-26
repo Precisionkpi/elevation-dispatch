@@ -66,19 +66,25 @@ st.markdown("""
     filter: invert(1) brightness(1.05);
     mix-blend-mode: screen;
   }
-  /* Faint airplane silhouette top-right */
+  /* Faint airplane silhouette top-right (desktop only) */
   .logo-wrap::after {
     content: "";
     position: absolute;
     top: 6px;
     right: 0;
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239bd5f5'><path d='M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z'/></svg>");
     background-repeat: no-repeat;
     background-size: contain;
-    opacity: 0.20;
+    opacity: 0.15;
     transform: rotate(45deg);
+  }
+  /* On phones the airplane overlaps the logo — just hide it */
+  @media (max-width: 640px) {
+    .logo-wrap::after { display: none; }
+    .logo-wrap img { width: 90%; }
+    .block-container > div:first-child { padding: 20px 18px 24px 18px; }
   }
 
   /* Title — cream text */
@@ -737,11 +743,11 @@ _section("Pre-flight Briefing")
 flight_type = st.radio("Flight Type *", options=config.FLIGHT_TYPES, index=None)
 
 # Route of Flight — single title with the Practice Area checkbox and optional
-# free-text field grouped underneath.
+# free-text field grouped underneath. (colors are inherited from the dark theme)
 st.markdown(
-    '<div style="font-weight:600;color:#0c2340;font-size:0.92rem;'
+    '<div style="font-weight:600;color:#f5f3ec;font-size:0.92rem;'
     'margin:0.5rem 0 0.1rem 0">Route of Flight *</div>'
-    '<div style="font-size:0.8rem;color:#64748b;'
+    '<div style="font-size:0.82rem;color:#b0d9f5;'
     'margin-bottom:0.4rem">Check the Practice Area box if that\'s where '
     'you\'re going. Otherwise, type the route in the field below.</div>',
     unsafe_allow_html=True,
