@@ -70,12 +70,10 @@ st.markdown("""
     pointer-events: none;
     z-index: 0;
   }
+  /* On phones the card is too narrow for the watermark — hide it */
   @media (max-width: 640px) {
     .block-container > div:first-child::before {
-      width: 56px;
-      height: 56px;
-      top: 14px;
-      right: 14px;
+      display: none;
     }
   }
 
