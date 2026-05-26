@@ -269,6 +269,16 @@ st.markdown("""
   footer, #MainMenu { display: none !important; }
   .stDeployButton { display: none !important; }
   header[data-testid="stHeader"] { background: transparent !important; }
+
+  /* Hide Streamlit's auto-generated heading anchor links (the chain icon
+     that appears on hover next to h1/h2/h3 titles) */
+  h1 > a, h2 > a, h3 > a, h4 > a, h5 > a, h6 > a,
+  [data-testid="stHeadingActionElements"],
+  [data-testid="stHeadingAnchor"],
+  .stMarkdown a[class*="anchor"],
+  a[class*="anchor-link"] {
+    display: none !important;
+  }
 </style>
 """, unsafe_allow_html=True)
 
