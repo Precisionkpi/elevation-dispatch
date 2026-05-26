@@ -51,6 +51,32 @@ st.markdown("""
     padding: 28px 36px 32px 36px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.06);
+    position: relative;
+    overflow: hidden;
+  }
+  /* Faint airplane watermark in the top-right corner of the form card */
+  .block-container > div:first-child::before {
+    content: "";
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    width: 90px;
+    height: 90px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239bd5f5'><path d='M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z'/></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: 0.10;
+    transform: rotate(45deg);
+    pointer-events: none;
+    z-index: 0;
+  }
+  @media (max-width: 640px) {
+    .block-container > div:first-child::before {
+      width: 56px;
+      height: 56px;
+      top: 14px;
+      right: 14px;
+    }
   }
 
   /* Logo block — invert the dark logo so it shows in cream on dark */
@@ -77,20 +103,7 @@ st.markdown("""
     font-weight: 800 !important;
     letter-spacing: -0.02em !important;
   }
-  h1::after {
-    content: "";
-    display: inline-block;
-    width: 0.85em;
-    height: 0.85em;
-    margin-left: 0.15em;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239bd5f5'><path d='M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z'/></svg>");
-    background-repeat: no-repeat;
-    background-size: contain;
-    background-position: center;
-    vertical-align: middle;
-    transform: rotate(45deg);
-    opacity: 0.25;
-  }
+  /* (airplane moved from inline-after-title to corner watermark above) */
 
   /* Subtitle / hint text */
   h1 + div p strong { color: #d2ecfc; font-weight: 500; }
@@ -271,13 +284,24 @@ st.markdown("""
   header[data-testid="stHeader"] { background: transparent !important; }
 
   /* Hide Streamlit's auto-generated heading anchor links (the chain icon
-     that appears on hover next to h1/h2/h3 titles) */
+     that appears on hover next to h1/h2/h3 titles). Streamlit rotates the
+     element/class names per release, so cast a wide net. */
+  h1 a[href^="#"], h2 a[href^="#"], h3 a[href^="#"],
+  h4 a[href^="#"], h5 a[href^="#"], h6 a[href^="#"],
   h1 > a, h2 > a, h3 > a, h4 > a, h5 > a, h6 > a,
   [data-testid="stHeadingActionElements"],
   [data-testid="stHeadingAnchor"],
+  [data-testid="stHeading"] a,
   .stMarkdown a[class*="anchor"],
-  a[class*="anchor-link"] {
+  a[class*="anchor-link"],
+  a[class*="HeadingAnchor"],
+  a[class*="headingAnchor"],
+  .stHeadingAnchor, .stHeadingActionElements,
+  span[data-testid*="StyledLinkIconContainer"] {
     display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 </style>
 """, unsafe_allow_html=True)
