@@ -19,32 +19,37 @@ from fsp_client import FSPClient, FSPError
 st.set_page_config(page_title=f"{config.COMPANY_NAME} Dispatch", page_icon="airplane", layout="centered")
 
 
-# ── Custom CSS — aviation theme (sky gradient + clouds) ────
+# ── Custom CSS — matches elevationflight.com branding ──────
 st.markdown("""
 <style>
-  /* Sky gradient page background with soft cloud blurs */
+  /* Brand fonts */
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Fraunces:wght@500;700&display=swap');
+
+  html, body, [class^="css"], [class*=" css"] {
+    font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+  }
+
+  /* Cream page background with subtle gradient (Elevation Flight palette) */
   [data-testid="stAppViewContainer"] {
     background:
-      radial-gradient(ellipse 800px 400px at 15% 10%, rgba(255,255,255,0.9) 0%, transparent 60%),
-      radial-gradient(ellipse 600px 300px at 85% 20%, rgba(255,255,255,0.7) 0%, transparent 60%),
-      radial-gradient(ellipse 700px 350px at 50% 80%, rgba(255,255,255,0.6) 0%, transparent 70%),
-      linear-gradient(180deg, #7cc6f0 0%, #b8def0 35%, #e0f2fa 70%, #f4fbff 100%);
+      radial-gradient(ellipse 900px 500px at 20% 15%, rgba(155, 213, 245, 0.18) 0%, transparent 60%),
+      radial-gradient(ellipse 700px 400px at 90% 85%, rgba(27, 103, 159, 0.06) 0%, transparent 60%),
+      linear-gradient(180deg, #fbfaf7 0%, #f5f3ec 100%);
     background-attachment: fixed;
   }
 
-  /* Make the main form container a "card" floating on the sky */
+  /* Main form container as a clean card */
   .block-container {
     padding-top: 4.5rem;
     padding-bottom: 4rem;
     max-width: 780px;
   }
   .block-container > div:first-child {
-    background: rgba(255, 255, 255, 0.94);
-    backdrop-filter: blur(8px);
-    border-radius: 18px;
+    background: #ffffff;
+    border-radius: 16px;
     padding: 28px 36px 32px 36px;
-    box-shadow: 0 8px 30px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 8px 30px rgba(17, 19, 24, 0.06), 0 2px 6px rgba(17, 19, 24, 0.03);
+    border: 1px solid rgba(17, 19, 24, 0.06);
   }
 
   /* Logo block */
@@ -54,7 +59,7 @@ st.markdown("""
     position: relative;
   }
   .logo-wrap img { max-width: 380px; width: 85%; height: auto; }
-  /* Decorative airplane silhouette top-right */
+  /* Subtle airplane silhouette top-right */
   .logo-wrap::after {
     content: "";
     position: absolute;
@@ -62,31 +67,31 @@ st.markdown("""
     right: 0;
     width: 56px;
     height: 56px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231f3a5f'><path d='M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z'/></svg>");
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231a1d23'><path d='M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z'/></svg>");
     background-repeat: no-repeat;
     background-size: contain;
-    opacity: 0.15;
+    opacity: 0.12;
     transform: rotate(45deg);
   }
 
-  /* Title - aviation navy */
+  /* Title — dark slate, serif accent feel via tight tracking */
   h1 {
-    color: #0c2340 !important;
+    color: #1a1d23 !important;
     font-weight: 800 !important;
-    letter-spacing: -0.01em !important;
+    letter-spacing: -0.02em !important;
   }
 
-  /* Section header with airplane accent */
+  /* Section header with brand-blue accent bar */
   .section-header {
     position: relative;
     font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.14em;
-    color: #1f3a5f;
+    color: #1a1d23;
     text-transform: uppercase;
     margin: 2rem 0 1rem 0;
     padding-left: 14px;
-    border-bottom: 2px solid #cfe8f7;
+    border-bottom: 1px solid #e6e3d8;
     padding-bottom: 6px;
   }
   .section-header::before {
@@ -96,75 +101,81 @@ st.markdown("""
     top: 2px;
     bottom: 8px;
     width: 4px;
-    background: linear-gradient(180deg, #1f6fb5, #0c2340);
+    background: linear-gradient(180deg, #4a9adb, #1b679f);
     border-radius: 3px;
   }
 
   /* Form labels */
   label[data-testid="stWidgetLabel"] p {
     font-weight: 600;
-    color: #0c2340;
-    font-size: 0.95rem;
+    color: #1a1d23;
+    font-size: 0.92rem;
   }
 
   /* Inputs */
   div[data-baseweb="input"] > div,
   div[data-baseweb="select"] > div,
   div[data-baseweb="textarea"] > div {
-    border-radius: 8px !important;
-    border: 1px solid #c8e0ef !important;
+    border-radius: 10px !important;
+    border: 1px solid #e6e3d8 !important;
     background: #ffffff !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   div[data-baseweb="input"]:focus-within > div,
   div[data-baseweb="select"]:focus-within > div {
-    border-color: #1f6fb5 !important;
-    box-shadow: 0 0 0 3px rgba(31, 111, 181, 0.15) !important;
+    border-color: #1b679f !important;
+    box-shadow: 0 0 0 3px rgba(27, 103, 159, 0.12) !important;
   }
 
   /* File uploader */
   [data-testid="stFileUploader"] section {
     border-radius: 10px;
-    border: 2px dashed #9fcaea;
-    background: #f0f9ff;
+    border: 2px dashed #c8e0ef;
+    background: #fbfaf7;
+  }
+  [data-testid="stFileUploader"] section:hover {
+    border-color: #1b679f;
+    background: #f5f3ec;
   }
 
-  /* Primary button - sky gradient */
+  /* Primary button — brand dark slate */
   div[data-testid="stButton"] > button[kind="primary"] {
     width: 100%;
     border-radius: 12px;
     padding: 0.9rem 2rem;
     font-weight: 700;
-    font-size: 1.05rem;
-    background: linear-gradient(135deg, #1f6fb5 0%, #0c2340 100%) !important;
+    font-size: 1.02rem;
+    background: linear-gradient(135deg, #1a1d23 0%, #2f3742 100%) !important;
     border: none !important;
-    box-shadow: 0 4px 14px rgba(12, 35, 64, 0.3);
+    color: #fbfaf7 !important;
+    box-shadow: 0 4px 14px rgba(17, 19, 24, 0.25);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
   div[data-testid="stButton"] > button[kind="primary"]:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 22px rgba(12, 35, 64, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 22px rgba(17, 19, 24, 0.35);
   }
 
   /* Alerts */
   div[data-testid="stAlert"] { border-radius: 10px; }
 
-  /* Stat block — sky theme */
+  /* Stat block — cream + sky accent */
   .stat {
     padding: 14px 16px;
     border-radius: 12px;
-    background: linear-gradient(135deg, #f4fbff 0%, #e0f2fa 100%);
-    border: 1px solid #c8e0ef;
-    box-shadow: 0 2px 6px rgba(31, 111, 181, 0.08);
+    background: linear-gradient(135deg, #ffffff 0%, #f7fbff 100%);
+    border: 1px solid #e6e3d8;
+    box-shadow: 0 2px 6px rgba(17, 19, 24, 0.04);
     min-height: 100px;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
   .stat:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 14px rgba(31, 111, 181, 0.18);
+    box-shadow: 0 6px 14px rgba(17, 19, 24, 0.08);
   }
   .stat-label {
     font-size: 0.72rem;
-    color: #1f6fb5;
+    color: #1b679f;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -172,7 +183,7 @@ st.markdown("""
   .stat-value {
     font-size: 1.7rem;
     font-weight: 800;
-    color: #0c2340;
+    color: #1a1d23;
     line-height: 1.2;
     margin-top: 6px;
   }
@@ -181,9 +192,33 @@ st.markdown("""
   .stat-value.danger { color: #dc2626; }
   .stat-detail {
     font-size: 0.76rem;
-    color: #475569;
+    color: #7a7f87;
     margin-top: 4px;
     white-space: normal;
+  }
+
+  /* Identity banner */
+  .ac-banner {
+    background: linear-gradient(135deg, #1a1d23, #2f3742);
+    color: #fbfaf7;
+    padding: 16px 22px;
+    border-radius: 12px;
+    margin: 6px 0 14px 0;
+    box-shadow: 0 4px 14px rgba(17, 19, 24, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ac-banner .ac-tail { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; }
+  .ac-banner .ac-model { font-size: 0.92rem; opacity: 0.8; margin-top: 2px; }
+  .ac-banner .ac-status {
+    background: rgba(155, 213, 245, 0.25);
+    color: #d2ecfc;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
   }
 
   /* Status pills */
@@ -199,8 +234,7 @@ st.markdown("""
   .status-warn { background: #fef3c7; color: #92400e; }
   .status-danger { background: #fee2e2; color: #991b1b; }
 
-  /* Hide chrome that lives INSIDE the iframe (the parent page's branding
-     can't be hidden from here because Streamlit Cloud wraps the app). */
+  /* Hide chrome inside the iframe */
   footer, #MainMenu { display: none !important; }
   .stDeployButton { display: none !important; }
   header[data-testid="stHeader"] { background: transparent !important; }
