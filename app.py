@@ -76,7 +76,7 @@ st.markdown("""
     .block-container > div:first-child::before {
       width: 40px;
       height: 40px;
-      top: 34px;
+      top: 56px;
       right: 12px;
     }
   }
