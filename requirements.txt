@@ -12,3 +12,4 @@ Pillow>=10.0
 gspread>=6.0
 google-auth>=2.30
 google-api-python-client>=2.140
+streamlit-local-storage>=0.0.25

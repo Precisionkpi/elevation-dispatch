@@ -3,6 +3,7 @@
 Streamlit replacement for the Google dispatch form, auto-populated from
 Flight Schedule Pro (aircraft list, instructors, maintenance status, squawks).
 """
+import hashlib
 import json
 import os
 from datetime import date as date_cls, datetime
@@ -14,6 +15,12 @@ import custom_auth
 import sheets_storage
 import storage
 from fsp_client import FSPClient, FSPError
+
+try:
+    from streamlit_local_storage import LocalStorage
+    _HAVE_LOCAL_STORAGE = True
+except ImportError:
+    _HAVE_LOCAL_STORAGE = False
 
 
 st.set_page_config(page_title=f"{config.COMPANY_NAME} Dispatch", page_icon="airplane", layout="centered")
@@ -465,6 +472,114 @@ def _days_status(days):
     return "danger" if days < 3 else "warn" if days < 14 else "ok"
 
 
+# ── Background draft save / restore (browser localStorage) ──
+# Persists in-progress form values to the browser, scoped to the FSP
+# reservation the draft was started for AND limited to a 4-hour window.
+# Pilot doesn't see anything UI-side — restore happens silently on load.
+DRAFT_MAX_AGE_HOURS = 4
+DRAFT_VERSION = "v1"
+# Only persist text/checkbox values the pilot typed by hand.
+# Skip auto-filled fields (date / block time / instructor / aircraft) — those
+# re-populate from FSP on reload anyway. File uploads can't be persisted.
+DRAFT_KEYS = [
+    "draft_flight_type",
+    "draft_practice_area",
+    "draft_route_typed",
+    "draft_notams_checked",
+    "draft_flight_plans",
+    "draft_tach_until_mx",
+    "draft_days_until_inspection",
+    "draft_squawks_ack",
+    "draft_student_on_flight",
+]
+
+
+@st.cache_resource
+def _ls():
+    if not _HAVE_LOCAL_STORAGE:
+        return None
+    try:
+        return LocalStorage()
+    except Exception:
+        return None
+
+
+def _draft_key(email):
+    h = hashlib.sha1((email or "anon").encode("utf-8")).hexdigest()[:10]
+    return f"dispatch_draft_{DRAFT_VERSION}_{h}"
+
+
+def _load_draft(email, current_reservation_number):
+    """Return the draft dict if it's valid (same reservation, < 4h old), else None."""
+    ls = _ls()
+    if not ls:
+        return None
+    key = _draft_key(email)
+    try:
+        raw = ls.getItem(key)
+    except Exception:
+        return None
+    if not raw:
+        return None
+    try:
+        draft = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    # Age check
+    try:
+        saved_at = datetime.fromisoformat(draft.get("saved_at_iso", ""))
+        if (datetime.now() - saved_at).total_seconds() / 3600 > DRAFT_MAX_AGE_HOURS:
+            try:
+                ls.deleteItem(key)
+            except Exception:
+                pass
+            return None
+    except (ValueError, TypeError):
+        return None
+    # Reservation must match (or both empty for manual entries)
+    draft_res = str(draft.get("reservation_number") or "")
+    cur_res = str(current_reservation_number or "")
+    if draft_res != cur_res:
+        try:
+            ls.deleteItem(key)
+        except Exception:
+            pass
+        return None
+    return draft.get("data", {})
+
+
+def _save_draft(email, reservation_number):
+    """Snapshot any DRAFT_KEYS currently in session_state to localStorage."""
+    ls = _ls()
+    if not ls or not email:
+        return
+    data = {k: st.session_state[k] for k in DRAFT_KEYS if k in st.session_state}
+    if not data:
+        return
+    payload = {
+        "data": data,
+        "saved_at_iso": datetime.now().isoformat(timespec="seconds"),
+        "reservation_number": str(reservation_number) if reservation_number else "",
+    }
+    try:
+        ls.setItem(_draft_key(email), json.dumps(payload))
+    except Exception:
+        pass
+
+
+def _clear_draft(email):
+    ls = _ls()
+    if not ls:
+        return
+    try:
+        ls.deleteItem(_draft_key(email))
+    except Exception:
+        pass
+    for k in DRAFT_KEYS:
+        st.session_state.pop(k, None)
+    st.session_state.pop("_draft_applied_for", None)
+
+
 # ── AUTH GATE (custom Google OAuth — bypasses st.login) ───
 AUTH_ENABLED = custom_auth.is_configured()
 
@@ -838,6 +953,7 @@ if matched_role in ("Instructor", "Renter", "Owner"):
     student_on_flight = st.text_input(
         "Flying with (passenger, student, or co-pilot)",
         value=default_other_pilot,
+        key="draft_student_on_flight",
         help=(
             "Auto-filled from your FSP reservation (excluding yourself). "
             "Works for dual students, a co-instructor (currency / requalification), "
@@ -992,10 +1108,28 @@ if selected_aircraft_id:
 st.divider()
 
 
+# ── Apply any valid in-progress draft from browser localStorage ─
+# Scoped to this reservation + last 4 hours; silently restores typed
+# fields and checkboxes the pilot had filled in before the tab discarded.
+_current_res_num = (reservation or {}).get("number") if reservation else None
+_draft_signature = f"{user_email}|{_current_res_num}"
+if user_email and st.session_state.get("_draft_applied_for") != _draft_signature:
+    _draft_data = _load_draft(user_email, _current_res_num)
+    if _draft_data:
+        for _k, _v in _draft_data.items():
+            if _k in DRAFT_KEYS and _k not in st.session_state:
+                st.session_state[_k] = _v
+    st.session_state["_draft_applied_for"] = _draft_signature
+
 _section("Pre-flight Briefing")
 
 # ── Remaining form fields ──────────────────────────────────
-flight_type = st.radio("Flight Type *", options=config.FLIGHT_TYPES, index=None)
+flight_type = st.radio(
+    "Flight Type *",
+    options=config.FLIGHT_TYPES,
+    index=None,
+    key="draft_flight_type",
+)
 
 # Route of Flight — single title with the Practice Area checkbox and optional
 # free-text field grouped underneath. (colors are inherited from the dark theme)
@@ -1007,7 +1141,7 @@ st.markdown(
     'you\'re going. Otherwise, type the route in the field below.</div>',
     unsafe_allow_html=True,
 )
-practice_area = st.checkbox("Practice Area", value=False)
+practice_area = st.checkbox("Practice Area", value=False, key="draft_practice_area")
 if practice_area:
     route = "Practice Area"
 else:
@@ -1016,6 +1150,7 @@ else:
         placeholder="e.g. KHEF KCJR KHEF",
         label_visibility="collapsed",
         help="Type the route, or check the Practice Area box above.",
+        key="draft_route_typed",
     )
 
 wb_file = st.file_uploader(
@@ -1029,9 +1164,13 @@ weather_file = st.file_uploader(
     help="Insert screenshot of weather along route from foreflight, AWC, or Leidos (at least 3 airports)",
 )
 
-notams_checked = st.checkbox("NOTAMs and TFRs Checked *")
-flight_plans = st.radio("Exit and return flight plans filed? *",
-                        options=config.FLIGHT_PLAN_OPTIONS, index=None)
+notams_checked = st.checkbox("NOTAMs and TFRs Checked *", key="draft_notams_checked")
+flight_plans = st.radio(
+    "Exit and return flight plans filed? *",
+    options=config.FLIGHT_PLAN_OPTIONS,
+    index=None,
+    key="draft_flight_plans",
+)
 
 _section("Maintenance Confirmation")
 
@@ -1044,6 +1183,7 @@ tach_until_mx = st.text_input(
     "Tach hours until next MX *",
     value="",
     help="Reference the FSP value shown above and type it in here (forces a conscious check).",
+    key="draft_tach_until_mx",
 )
 
 # Days until Inspection — same pattern
@@ -1055,13 +1195,23 @@ days_until_inspection = st.text_input(
     "Days until next Inspection *",
     value="",
     help="Reference the FSP value shown above and type it in here (forces a conscious check).",
+    key="draft_days_until_inspection",
 )
 
 squawks_ack = False
 if squawks:
-    squawks_ack = st.checkbox(f"I have reviewed all {len(squawks)} open squawks *")
+    squawks_ack = st.checkbox(
+        f"I have reviewed all {len(squawks)} open squawks *",
+        key="draft_squawks_ack",
+    )
 
 st.divider()
+
+
+# Persist the current snapshot of in-progress fields to browser storage
+# (scoped to this reservation, expires after 4 hours).
+if user_email:
+    _save_draft(user_email, _current_res_num)
 
 
 # ── Submit ─────────────────────────────────────────────────
@@ -1201,6 +1351,9 @@ if st.button("Submit Dispatch", type="primary"):
             pdf_bytes_for_download = storage.generate_pdf(dispatch_id)
         except Exception:
             pass
+
+        # Successful submission — clear the in-progress draft from localStorage
+        _clear_draft(user_email)
 
         # Stash everything for the confirmation page and rerun
         st.session_state["last_dispatch"] = {
