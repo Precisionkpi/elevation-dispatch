@@ -577,7 +577,12 @@ if "last_dispatch" in st.session_state:
 debug_mode = False  # debug expander hidden in production
 with st.sidebar:
     if AUTH_ENABLED and user_email:
-        st.markdown(f"**Signed in as**  \n{user_name_from_auth}  \n`{user_email}`")
+        login_method = (st.session_state.get("_oauth_user") or {}).get("login_method", "google")
+        method_tag = " <span style='font-size:0.7rem;color:#9bd5f5'>(via FSP email)</span>" if login_method == "fsp_email" else ""
+        st.markdown(
+            f"**Signed in as**{method_tag}  \n{user_name_from_auth}  \n`{user_email}`",
+            unsafe_allow_html=True,
+        )
         if st.button("Sign out", use_container_width=True):
             custom_auth.logout()
             st.rerun()
