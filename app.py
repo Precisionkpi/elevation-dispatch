@@ -458,6 +458,49 @@ def _stat_block(label, value, detail=None, status="ok"):
     )
 
 
+def _mime_for(name):
+    lname = (name or "").lower()
+    if lname.endswith(".png"):
+        return "image/png"
+    if lname.endswith(".jpg") or lname.endswith(".jpeg"):
+        return "image/jpeg"
+    if lname.endswith(".pdf"):
+        return "application/pdf"
+    return "application/octet-stream"
+
+
+def _eager_upload(file_obj, slot):
+    """Upload to Drive the moment a file is picked (Google-Forms-style).
+
+    Caches the URL keyed by file fingerprint so re-renders don't re-upload
+    the same file. Returns the Drive URL or None if upload isn't configured
+    or fails."""
+    if not file_obj:
+        return None
+    if not (config.APPS_SCRIPT_UPLOAD_URL or config.GOOGLE_DRIVE_FOLDER_ID):
+        return None
+    fp = f"{file_obj.name}|{file_obj.size}"
+    fp_key = f"_eager_fp_{slot}"
+    url_key = f"draft_{slot}_url"
+    name_key = f"draft_{slot}_filename"
+    if st.session_state.get(fp_key) == fp and st.session_state.get(url_key):
+        return st.session_state[url_key]
+    try:
+        with st.spinner(f"Uploading {file_obj.name}…"):
+            url = sheets_storage.upload_to_drive(
+                file_obj.getvalue(),
+                f"dispatch-pending-{slot}-{file_obj.name}",
+                _mime_for(file_obj.name),
+            )
+        st.session_state[fp_key] = fp
+        st.session_state[url_key] = url
+        st.session_state[name_key] = file_obj.name
+        return url
+    except Exception as e:
+        st.warning(f"Couldn't upload {file_obj.name}: {str(e)[:140]}")
+        return None
+
+
 def _hours_status(hours):
     """Tach hours remaining: red < 5, orange < 10, else green."""
     if hours is None:
@@ -491,6 +534,11 @@ DRAFT_KEYS = [
     "draft_days_until_inspection",
     "draft_squawks_ack",
     "draft_student_on_flight",
+    # File uploads: eager-uploaded to Drive on selection, URL persisted
+    "draft_wb_url",
+    "draft_wb_filename",
+    "draft_weather_url",
+    "draft_weather_filename",
 ]
 
 
@@ -1153,15 +1201,56 @@ else:
         key="draft_route_typed",
     )
 
-wb_file = st.file_uploader(
+def _render_file_slot(slot, label, help_text):
+    """Render the file-uploader OR a 'previously uploaded' indicator if the
+    pilot already eager-uploaded one this session / draft."""
+    url_key = f"draft_{slot}_url"
+    name_key = f"draft_{slot}_filename"
+    replace_key = f"_replace_{slot}"
+    cached_url = st.session_state.get(url_key)
+    cached_name = st.session_state.get(name_key)
+    if cached_url and not st.session_state.get(replace_key):
+        st.markdown(f"<div style='font-weight:600;color:#fbfaf7;font-size:0.92rem;"
+                    f"margin:0.5rem 0 0.3rem 0'>{label}</div>",
+                    unsafe_allow_html=True)
+        cols = st.columns([4, 1])
+        with cols[0]:
+            st.markdown(
+                f"<div style='padding:11px 14px; background:rgba(34,197,94,0.10); "
+                f"border:1px solid rgba(34,197,94,0.30); border-radius:10px; "
+                f"color:#86efac; font-size:0.92rem'>"
+                f"✓ Uploaded: <b>{cached_name}</b></div>",
+                unsafe_allow_html=True,
+            )
+        with cols[1]:
+            if st.button("Replace", key=f"btn_{replace_key}", use_container_width=True):
+                st.session_state[replace_key] = True
+                st.session_state.pop(url_key, None)
+                st.session_state.pop(name_key, None)
+                st.session_state.pop(f"_eager_fp_{slot}", None)
+                st.rerun()
+        return None  # no new file picked this render
+    file_obj = st.file_uploader(
+        label,
+        type=["png", "jpg", "jpeg", "pdf"],
+        help=help_text,
+        key=f"upload_{slot}",
+    )
+    st.session_state.pop(replace_key, None)
+    if file_obj:
+        _eager_upload(file_obj, slot)
+    return file_obj
+
+
+wb_file = _render_file_slot(
+    "wb",
     "Weight and Balance *",
-    type=["png", "jpg", "jpeg", "pdf"],
-    help="Insert screen shot of W+B from foreflight (max 10 MB)",
+    "Insert screen shot of W+B from foreflight (max 10 MB). Uploads to Drive as soon as you pick it — comes back automatically if you reload.",
 )
-weather_file = st.file_uploader(
+weather_file = _render_file_slot(
+    "weather",
     "Weather Briefing *",
-    type=["png", "jpg", "jpeg", "pdf"],
-    help="Insert screenshot of weather along route from foreflight, AWC, or Leidos (at least 3 airports)",
+    "Insert screenshot of weather along route from foreflight, AWC, or Leidos (at least 3 airports). Uploads to Drive as soon as you pick it.",
 )
 
 notams_checked = st.checkbox("NOTAMs and TFRs Checked *", key="draft_notams_checked")
@@ -1227,9 +1316,9 @@ if st.button("Submit Dispatch", type="primary"):
         errors.append("Flight Type is required")
     if not route.strip():
         errors.append("Route of Flight is required")
-    if not wb_file:
+    if not (wb_file or st.session_state.get("draft_wb_url")):
         errors.append("Weight and Balance image is required")
-    if not weather_file:
+    if not (weather_file or st.session_state.get("draft_weather_url")):
         errors.append("Weather Briefing image is required")
     if not notams_checked:
         errors.append("NOTAMs and TFRs must be checked")
@@ -1288,42 +1377,36 @@ if st.button("Submit Dispatch", type="primary"):
             wb_url = ""
             weather_url = ""
 
-            def _mime(name):
-                lname = (name or "").lower()
-                if lname.endswith(".png"):
-                    return "image/png"
-                if lname.endswith(".jpg") or lname.endswith(".jpeg"):
-                    return "image/jpeg"
-                if lname.endswith(".pdf"):
-                    return "application/pdf"
-                return "application/octet-stream"
+            # (mime helper moved to module level as _mime_for)
 
-            # Attempt upload if either route is configured (Apps Script bridge
-            # OR a Shared Drive folder where the service account is a member).
+            # Files were eager-uploaded when picked, so URLs already in session.
+            # As a fallback, if for some reason the eager upload didn't run
+            # (no upload configured at that moment, etc.), upload now.
             upload_configured = bool(
                 config.APPS_SCRIPT_UPLOAD_URL or config.GOOGLE_DRIVE_FOLDER_ID
             )
+            wb_url = st.session_state.get("draft_wb_url") or ""
+            weather_url = st.session_state.get("draft_weather_url") or ""
             upload_errors = []
             if upload_configured:
-                with st.spinner("Uploading attachments..."):
-                    if wb_file:
-                        try:
-                            wb_url = sheets_storage.upload_to_drive(
-                                wb_file.getvalue(),
-                                f"dispatch-{dispatch_id}-wb-{wb_file.name}",
-                                _mime(wb_file.name),
-                            )
-                        except Exception as e:
-                            upload_errors.append(f"W&B: {str(e)[:140]}")
-                    if weather_file:
-                        try:
-                            weather_url = sheets_storage.upload_to_drive(
-                                weather_file.getvalue(),
-                                f"dispatch-{dispatch_id}-weather-{weather_file.name}",
-                                _mime(weather_file.name),
-                            )
-                        except Exception as e:
-                            upload_errors.append(f"Weather: {str(e)[:140]}")
+                if wb_file and not wb_url:
+                    try:
+                        wb_url = sheets_storage.upload_to_drive(
+                            wb_file.getvalue(),
+                            f"dispatch-{dispatch_id}-wb-{wb_file.name}",
+                            _mime_for(wb_file.name),
+                        )
+                    except Exception as e:
+                        upload_errors.append(f"W&B: {str(e)[:140]}")
+                if weather_file and not weather_url:
+                    try:
+                        weather_url = sheets_storage.upload_to_drive(
+                            weather_file.getvalue(),
+                            f"dispatch-{dispatch_id}-weather-{weather_file.name}",
+                            _mime_for(weather_file.name),
+                        )
+                    except Exception as e:
+                        upload_errors.append(f"Weather: {str(e)[:140]}")
             for ue in upload_errors:
                 st.info(f"Image upload skipped — {ue}")
 
@@ -1337,8 +1420,8 @@ if st.button("Submit Dispatch", type="primary"):
                     tach=(ac_meter or {}).get("tach") if ac_meter else None,
                     wb_url=wb_url,
                     weather_url=weather_url,
-                    wb_filename=(wb_file.name if wb_file else ""),
-                    weather_filename=(weather_file.name if weather_file else ""),
+                    wb_filename=(wb_file.name if wb_file else st.session_state.get("draft_wb_filename", "")),
+                    weather_filename=(weather_file.name if weather_file else st.session_state.get("draft_weather_filename", "")),
                     reservation_number=str(reservation.get("number")) if reservation and reservation.get("number") else "",
                 )
                 sheet_msg = " · logged to Google Sheet"
