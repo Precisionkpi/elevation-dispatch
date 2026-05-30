@@ -619,14 +619,17 @@ def _save_draft(email, reservation_number):
 
 def _clear_draft(email):
     ls = _ls()
-    if not ls:
-        return
-    try:
-        ls.deleteItem(_draft_key(email))
-    except Exception:
-        pass
+    if ls:
+        try:
+            ls.deleteItem(_draft_key(email))
+        except Exception:
+            pass
     for k in DRAFT_KEYS:
         st.session_state.pop(k, None)
+    # Also reset the eager-upload tracking so the next session starts fresh.
+    for slot in ("wb", "weather"):
+        st.session_state.pop(f"_eager_fp_{slot}", None)
+        st.session_state.pop(f"_replace_{slot}", None)
     st.session_state.pop("_draft_applied_for", None)
 
 
@@ -829,6 +832,9 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
         if st.button("Sign out", use_container_width=True):
+            # Explicit sign-out = "I'm done" — clear any in-progress draft
+            # so they don't get a stale form when they sign back in later.
+            _clear_draft(user_email)
             custom_auth.logout()
             st.rerun()
 
