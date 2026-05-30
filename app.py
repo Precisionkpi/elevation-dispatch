@@ -706,42 +706,46 @@ if AUTH_ENABLED:
             "</div></div>",
             unsafe_allow_html=True,
         )
-        email_in = st.text_input(
-            "FSP email",
-            placeholder="you@example.com",
-            key="_fsp_email_login_email",
-            label_visibility="collapsed",
-        )
-        if st.button("Sign in with FSP email", key="_fsp_email_login_btn",
-                     use_container_width=True):
-                email_lc = (email_in or "").strip().lower()
-                if not email_lc:
-                    st.error("Enter the email registered on your FSP profile.")
+        with st.form("_fsp_email_login_form", clear_on_submit=False, border=False):
+            email_in = st.text_input(
+                "FSP email",
+                placeholder="you@example.com",
+                key="_fsp_email_login_email",
+                label_visibility="collapsed",
+            )
+            submitted_email_login = st.form_submit_button(
+                "Sign in with FSP email",
+                use_container_width=True,
+            )
+        if submitted_email_login:
+            email_lc = (email_in or "").strip().lower()
+            if not email_lc:
+                st.error("Enter the email registered on your FSP profile.")
+            else:
+                try:
+                    pilots_for_lookup = _client().list_pilots()
+                except FSPError as e:
+                    pilots_for_lookup = []
+                    st.error(f"Couldn't reach FSP to verify: {e}")
+                matched_login = next(
+                    (p for p in pilots_for_lookup
+                     if (p.get("email") or "").lower() == email_lc),
+                    None,
+                )
+                if matched_login:
+                    st.session_state["_oauth_user"] = {
+                        "email": email_lc,
+                        "name": matched_login.get("name") or email_lc,
+                        "picture": None,
+                        "login_method": "fsp_email",
+                    }
+                    st.rerun()
                 else:
-                    try:
-                        pilots_for_lookup = _client().list_pilots()
-                    except FSPError as e:
-                        pilots_for_lookup = []
-                        st.error(f"Couldn't reach FSP to verify: {e}")
-                    matched_login = next(
-                        (p for p in pilots_for_lookup
-                         if (p.get("email") or "").lower() == email_lc),
-                        None,
+                    st.error(
+                        f"No FSP record found with email **{email_lc}**. "
+                        "Check spelling, or ask your school admin to "
+                        "confirm what's on your FSP profile."
                     )
-                    if matched_login:
-                        st.session_state["_oauth_user"] = {
-                            "email": email_lc,
-                            "name": matched_login.get("name") or email_lc,
-                            "picture": None,
-                            "login_method": "fsp_email",
-                        }
-                        st.rerun()
-                    else:
-                        st.error(
-                            f"No FSP record found with email **{email_lc}**. "
-                            "Check spelling, or ask your school admin to "
-                            "confirm what's on your FSP profile."
-                        )
         st.stop()
     user_email = user["email"]
     user_name_from_auth = user["name"]
