@@ -495,7 +495,9 @@ def _eager_upload(file_obj, slot):
         st.session_state[fp_key] = fp
         st.session_state[url_key] = url
         st.session_state[name_key] = file_obj.name
-        return url
+        # Force a rerun so the UI immediately transitions from the
+        # file-picker view to the "✓ Uploaded" indicator.
+        st.rerun()
     except Exception as e:
         st.warning(f"Couldn't upload {file_obj.name}: {str(e)[:140]}")
         return None
