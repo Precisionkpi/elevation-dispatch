@@ -492,29 +492,60 @@ if AUTH_ENABLED:
         st.title(config.DISPATCH_TITLE)
         st.markdown(f"**{config.DISPATCH_SUBTITLE}**")
         st.markdown("")
-        st.info("Please sign in to continue.")
-        st.link_button("Sign in with Google", custom_auth.login_url(), type="primary")
-
         st.markdown(
-            "<div style='text-align:center; color:#9ca3af; font-size:0.85rem; "
-            "margin: 12px 0 4px 0'>or</div>",
+            "<div style='background: rgba(155, 213, 245, 0.10); "
+            "border-left: 3px solid #4a9adb; border-radius: 8px; "
+            "padding: 12px 16px; margin-bottom: 16px; "
+            "color: #f5f3ec; font-size: 0.95rem; line-height: 1.45'>"
+            "<b>Important:</b> sign in with the email that's on your "
+            "<b>Flight Schedule Pro</b> profile. If your Google account "
+            "uses a different email than FSP, use the FSP-email option below."
+            "</div>",
             unsafe_allow_html=True,
         )
-        with st.expander("Sign in with your FSP email instead"):
-            st.caption(
-                "For pilots whose FSP profile uses a non-Google email "
-                "(Yahoo, AOL, personal domain, etc.). Type the email exactly "
-                "as it appears on your FSP profile. Sign-in is verified "
-                "against your FSP record only — every submission is logged "
-                "with this email."
-            )
-            email_in = st.text_input(
-                "FSP email",
-                placeholder="you@example.com",
-                key="_fsp_email_login_email",
-            )
-            if st.button("Continue", key="_fsp_email_login_btn",
-                         use_container_width=True):
+        st.link_button(
+            "Sign in with Google",
+            custom_auth.login_url(),
+            type="primary",
+            use_container_width=True,
+        )
+
+        # Big "OR" divider
+        st.markdown(
+            "<div style='display:flex; align-items:center; gap:14px; "
+            "margin: 22px 0 18px 0'>"
+            "<div style='flex:1; height:1px; background:rgba(155,213,245,0.25)'></div>"
+            "<div style='font-size:1.05rem; font-weight:700; "
+            "color:#9bd5f5; letter-spacing:0.2em'>OR</div>"
+            "<div style='flex:1; height:1px; background:rgba(155,213,245,0.25)'></div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        # Distinct email-login card
+        st.markdown(
+            "<div style='background: rgba(17, 19, 24, 0.55); "
+            "border: 1px solid rgba(155, 213, 245, 0.22); "
+            "border-radius: 12px; padding: 18px 20px 8px 20px; "
+            "margin-bottom: 4px'>"
+            "<div style='font-weight:700; color:#fbfaf7; font-size:1.05rem; "
+            "margin-bottom:6px'>Sign in with your FSP email</div>"
+            "<div style='font-size:0.95rem; color:#d2ecfc; line-height:1.5; "
+            "margin-bottom:14px'>"
+            "For pilots whose FSP profile uses a non-Google email "
+            "(Yahoo, AOL, personal domain, etc.). Type the email "
+            "<b>exactly</b> as it appears on your FSP profile."
+            "</div></div>",
+            unsafe_allow_html=True,
+        )
+        email_in = st.text_input(
+            "FSP email",
+            placeholder="you@example.com",
+            key="_fsp_email_login_email",
+            label_visibility="collapsed",
+        )
+        if st.button("Sign in with FSP email", key="_fsp_email_login_btn",
+                     use_container_width=True):
                 email_lc = (email_in or "").strip().lower()
                 if not email_lc:
                     st.error("Enter the email registered on your FSP profile.")
