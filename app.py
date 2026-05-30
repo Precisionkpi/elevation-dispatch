@@ -276,6 +276,72 @@ st.markdown("""
   /* Dividers */
   hr { border-color: rgba(255, 255, 255, 0.08) !important; }
 
+  /* Confirmation page styles */
+  .success-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(34,197,94,0.20), rgba(34,197,94,0.08));
+    border: 2px solid #22c55e;
+    box-shadow: 0 0 0 6px rgba(34,197,94,0.06), 0 4px 22px rgba(34,197,94,0.25);
+  }
+  .success-title {
+    text-align: center;
+    color: #fbfaf7 !important;
+    font-weight: 800 !important;
+    font-size: 2rem !important;
+    margin: 18px 0 4px 0 !important;
+  }
+  .success-sub {
+    text-align: center;
+    color: #b0d9f5;
+    font-size: 0.95rem;
+    margin-bottom: 24px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .summary-card {
+    background: rgba(17, 19, 24, 0.55);
+    border: 1px solid rgba(155, 213, 245, 0.18);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin: 0 0 20px 0;
+  }
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    gap: 16px;
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #9bd5f5;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    flex: 0 0 auto;
+  }
+  .summary-value {
+    font-size: 0.98rem;
+    color: #fbfaf7;
+    font-weight: 500;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .destinations-line {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.85rem;
+    margin: 8px 0 22px 0;
+  }
+
   /* Hide chrome inside the iframe */
   footer, #MainMenu { display: none !important; }
   .stDeployButton { display: none !important; }
@@ -431,6 +497,80 @@ if AUTH_ENABLED:
         st.stop()
     user_email = user["email"]
     user_name_from_auth = user["name"]
+
+
+# ── Confirmation page (renders instead of the form after a submit) ─
+def _render_confirmation_page(last):
+    _render_logo()
+    # Success badge (centered checkmark in a green ring)
+    st.markdown(
+        '<div style="text-align:center; padding: 8px 0 0 0;">'
+        '<div class="success-circle">'
+        '<svg width="42" height="42" viewBox="0 0 24 24" fill="none">'
+        '<path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="3" '
+        'stroke-linecap="round" stroke-linejoin="round"/>'
+        '</svg></div></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<div class="success-title">Dispatch Submitted</div>'
+        f'<div class="success-sub">Confirmation #{last["id"]}</div>',
+        unsafe_allow_html=True,
+    )
+    # Summary card
+    rows = [
+        ("Pilot", last.get("pilot_name")),
+        ("Date", last.get("flight_date")),
+        ("Block Time", last.get("block_time")),
+        ("Aircraft", last.get("aircraft")),
+        ("Instructor", last.get("instructor")),
+        ("Flight Type", last.get("flight_type")),
+        ("Route", last.get("route")),
+    ]
+    if last.get("flying_with"):
+        rows.insert(1, ("Flying With", last["flying_with"]))
+    rows_html = "".join(
+        f'<div class="summary-row"><span class="summary-label">{lbl}</span>'
+        f'<span class="summary-value">{val}</span></div>'
+        for lbl, val in rows if val
+    )
+    st.markdown(f'<div class="summary-card">{rows_html}</div>', unsafe_allow_html=True)
+
+    # Where it landed
+    where = []
+    if last.get("sheet_logged"):
+        where.append("Google Sheet")
+    if last.get("drive_uploaded"):
+        where.append("Drive folder")
+    where.append("local backup")
+    st.markdown(
+        f'<div class="destinations-line">Saved to: {" · ".join(where)}</div>',
+        unsafe_allow_html=True,
+    )
+
+    # PDF download (primary action)
+    if last.get("pdf_bytes"):
+        st.download_button(
+            "Download PDF copy",
+            data=last["pdf_bytes"],
+            file_name=f"dispatch-{last['id']}.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+        )
+    else:
+        st.info("PDF copy unavailable for this submission.")
+
+    st.markdown("")
+    # Submit another (secondary action)
+    if st.button("Submit another dispatch", use_container_width=True):
+        del st.session_state["last_dispatch"]
+        st.rerun()
+
+
+if "last_dispatch" in st.session_state:
+    _render_confirmation_page(st.session_state["last_dispatch"])
+    st.stop()
 
 
 # ── Sidebar ────────────────────────────────────────────────
@@ -970,15 +1110,26 @@ if st.button("Submit Dispatch", type="primary"):
             except Exception as e:
                 st.warning(f"Google Sheet write failed (saved locally): {e}")
 
-        st.success(f"Dispatch #{dispatch_id} submitted{sheet_msg}.")
+        # Generate the PDF now so we can offer it on the confirmation page
+        pdf_bytes_for_download = None
         try:
-            pdf_bytes = storage.generate_pdf(dispatch_id)
-            if pdf_bytes:
-                st.download_button(
-                    "Download PDF",
-                    data=pdf_bytes,
-                    file_name=f"dispatch-{dispatch_id}.pdf",
-                    mime="application/pdf",
-                )
-        except Exception as e:
-            st.warning(f"PDF generation failed: {e}")
+            pdf_bytes_for_download = storage.generate_pdf(dispatch_id)
+        except Exception:
+            pass
+
+        # Stash everything for the confirmation page and rerun
+        st.session_state["last_dispatch"] = {
+            "id": dispatch_id,
+            "pilot_name": record.get("pilot_name"),
+            "flight_date": record.get("flight_date"),
+            "block_time": record.get("block_time"),
+            "aircraft": record.get("aircraft"),
+            "instructor": record.get("instructor"),
+            "flight_type": record.get("flight_type"),
+            "route": record.get("route"),
+            "flying_with": record.get("student_on_flight"),
+            "sheet_logged": bool(sheet_msg),
+            "drive_uploaded": bool(wb_url or weather_url) if sheets_storage.enabled() else False,
+            "pdf_bytes": pdf_bytes_for_download,
+        }
+        st.rerun()
