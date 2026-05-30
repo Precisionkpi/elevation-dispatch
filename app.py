@@ -1435,6 +1435,21 @@ if st.button("Submit Dispatch", type="primary"):
         except Exception:
             pass
 
+        # Rename any "dispatch-pending-*" Drive files to "dispatch-{id}-*"
+        # so the Drive folder cleanly shows which files belong to submitted
+        # dispatches vs which are orphans from abandoned drafts.
+        for _slot, _orig_name in (
+            ("wb", st.session_state.get("draft_wb_filename")),
+            ("weather", st.session_state.get("draft_weather_filename")),
+        ):
+            _url = st.session_state.get(f"draft_{_slot}_url")
+            if _url and _orig_name:
+                _fid = sheets_storage.file_id_from_url(_url)
+                if _fid:
+                    sheets_storage.rename_drive_file(
+                        _fid, f"dispatch-{dispatch_id}-{_slot}-{_orig_name}",
+                    )
+
         # Successful submission — clear the in-progress draft from localStorage
         _clear_draft(user_email)
 

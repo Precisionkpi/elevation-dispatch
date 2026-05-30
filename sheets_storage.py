@@ -205,6 +205,33 @@ def _upload_via_apps_script(file_bytes: bytes, filename: str, mimetype: str) -> 
     return url
 
 
+def file_id_from_url(url: str) -> str:
+    """Pull the Drive file ID out of a `/d/<id>/view` URL."""
+    import re
+    if not url:
+        return ""
+    m = re.search(r"/d/([a-zA-Z0-9_-]+)", url)
+    return m.group(1) if m else ""
+
+
+def rename_drive_file(file_id: str, new_name: str) -> bool:
+    """Rename a Drive file by its id. Returns True on success."""
+    if not file_id or not new_name:
+        return False
+    if not enabled():
+        return False
+    try:
+        service = _drive_service()
+        service.files().update(
+            fileId=file_id,
+            body={"name": new_name},
+            supportsAllDrives=True,
+        ).execute()
+        return True
+    except Exception:
+        return False
+
+
 def _hyperlink(url: str, label: str) -> str:
     """Wrap a URL as a Sheet HYPERLINK formula. value_input_option=USER_ENTERED parses it."""
     if not url:
