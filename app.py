@@ -1035,14 +1035,32 @@ if selected_student and flight_date:
         reservation_error = str(e)
         reservations = []
     if reservations:
+        # Put flights that haven't ended yet at the top so an instructor with
+        # both an earlier (already-flown) and a later (upcoming) flight on
+        # the same day defaults to the right one.
+        _now_iso = datetime.now().isoformat()
+        def _relevance(r):
+            end_t = r.get("end_time") or ""
+            is_past = bool(end_t and end_t < _now_iso)
+            return (1 if is_past else 0, r.get("start_time") or "9999")
+        reservations.sort(key=_relevance)
+
         if len(reservations) == 1:
             reservation = reservations[0]
         else:
-            res_options = [
-                f"#{r['number']}  {r['start_time'][11:16]}–{r['end_time'][11:16]}  "
-                f"{r.get('type') or '?'}  ({r.get('aircraft_tail') or 'no AC'})"
-                for r in reservations
-            ]
+            def _label(r):
+                pilots = ", ".join(r.get("pilot_names") or []) or "no pilot"
+                instr = r.get("instructor_name") or "no instructor"
+                start = (r.get("start_time") or "")[11:16]
+                end = (r.get("end_time") or "")[11:16]
+                ac = r.get("aircraft_tail") or "no AC"
+                end_t = r.get("end_time") or ""
+                past_tag = "  · (already ended)" if end_t and end_t < _now_iso else ""
+                return (
+                    f"#{r.get('number')}  {start}–{end}  ·  "
+                    f"{pilots} w/ {instr}  ·  {ac}{past_tag}"
+                )
+            res_options = [_label(r) for r in reservations]
             pick = st.selectbox(
                 "Multiple reservations on this date — pick one:",
                 options=range(len(res_options)),
