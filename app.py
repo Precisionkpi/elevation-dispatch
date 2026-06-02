@@ -722,7 +722,10 @@ if AUTH_ENABLED:
     # If Streamlit's session lost the login (e.g., iPad Safari killed the
     # WebSocket), try to restore from localStorage so the pilot doesn't get
     # punted back to the login screen.
-    if not user:
+    # Exception: if they JUST clicked Sign Out, suppress the restore for one
+    # script run so the localStorage delete has time to flush. Otherwise the
+    # async nature of streamlit-local-storage would resurrect the login.
+    if not user and not st.session_state.pop("_just_signed_out", False):
         cached = _load_session()
         if cached:
             st.session_state["_oauth_user"] = cached
@@ -910,11 +913,13 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
         if st.button("Sign out", use_container_width=True):
-            # Explicit sign-out = "I'm done" — clear any in-progress draft
-            # so they don't get a stale form when they sign back in later.
+            # Explicit sign-out = "I'm done" — clear draft, clear cached
+            # login, and set a flag so the next script run doesn't silently
+            # restore the login from a not-yet-flushed localStorage entry.
             _clear_draft(user_email)
             _clear_session()
             custom_auth.logout()
+            st.session_state["_just_signed_out"] = True
             st.rerun()
 
 
@@ -1045,28 +1050,34 @@ if selected_student and flight_date:
             return (1 if is_past else 0, r.get("start_time") or "9999")
         reservations.sort(key=_relevance)
 
-        if len(reservations) == 1:
-            reservation = reservations[0]
-        else:
-            def _label(r):
-                pilots = ", ".join(r.get("pilot_names") or []) or "no pilot"
-                instr = r.get("instructor_name") or "no instructor"
-                start = (r.get("start_time") or "")[11:16]
-                end = (r.get("end_time") or "")[11:16]
-                ac = r.get("aircraft_tail") or "no AC"
-                end_t = r.get("end_time") or ""
-                past_tag = "  · (already ended)" if end_t and end_t < _now_iso else ""
-                return (
-                    f"#{r.get('number')}  {start}–{end}  ·  "
-                    f"{pilots} w/ {instr}  ·  {ac}{past_tag}"
-                )
-            res_options = [_label(r) for r in reservations]
-            pick = st.selectbox(
-                "Multiple reservations on this date — pick one:",
-                options=range(len(res_options)),
-                format_func=lambda i: res_options[i],
+        def _label(r):
+            pilots = ", ".join(r.get("pilot_names") or []) or "no pilot"
+            instr = r.get("instructor_name") or "no instructor"
+            start = (r.get("start_time") or "")[11:16]
+            end = (r.get("end_time") or "")[11:16]
+            ac = r.get("aircraft_tail") or "no AC"
+            end_t = r.get("end_time") or ""
+            past_tag = "  · (already ended)" if end_t and end_t < _now_iso else ""
+            return (
+                f"#{r.get('number')}  {start}–{end}  ·  "
+                f"{pilots} w/ {instr}  ·  {ac}{past_tag}"
             )
-            reservation = reservations[pick]
+
+        res_options = [_label(r) for r in reservations]
+        # Always show the dropdown — even with a single reservation —
+        # so the instructor can override if the auto-pick is wrong.
+        label_text = (
+            "Reservation (auto-filled — change here if needed):"
+            if len(reservations) == 1
+            else "Multiple reservations on this date — pick one:"
+        )
+        pick = st.selectbox(
+            label_text,
+            options=range(len(res_options)),
+            format_func=lambda i: res_options[i],
+            index=0,
+        )
+        reservation = reservations[pick]
         st.success(
             f"Auto-filled from FSP reservation #{reservation['number']} "
             f"({reservation.get('type') or 'flight'})"
