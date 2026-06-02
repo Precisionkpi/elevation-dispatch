@@ -716,20 +716,14 @@ user_name_from_auth = ""
 if AUTH_ENABLED:
     # If we just came back from Google with ?code=, process it.
     if custom_auth.handle_callback():
-        _save_session(custom_auth.get_user())
         st.rerun()
     user = custom_auth.get_user()
-    # If Streamlit's session lost the login (e.g., iPad Safari killed the
-    # WebSocket), try to restore from localStorage so the pilot doesn't get
-    # punted back to the login screen.
-    # Exception: if they JUST clicked Sign Out, suppress the restore for one
-    # script run so the localStorage delete has time to flush. Otherwise the
-    # async nature of streamlit-local-storage would resurrect the login.
-    if not user and not st.session_state.pop("_just_signed_out", False):
-        cached = _load_session()
-        if cached:
-            st.session_state["_oauth_user"] = cached
-            user = cached
+    # NOTE: previously we restored login from localStorage to survive iPad
+    # WebSocket disconnects, but the single shared cache slot caused
+    # cross-user identity confusion (signing in as one person showed up as
+    # someone else who'd used the same browser). Removed. If session is
+    # lost, user re-authenticates — draft is still preserved in their own
+    # localStorage so they don't lose form data.
     if not user:
         _render_logo()
         st.title(config.DISPATCH_TITLE)
@@ -815,7 +809,6 @@ if AUTH_ENABLED:
                         "login_method": "fsp_email",
                     }
                     st.session_state["_oauth_user"] = _user_info
-                    _save_session(_user_info)
                     st.rerun()
                 else:
                     st.error(
@@ -913,13 +906,10 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
         if st.button("Sign out", use_container_width=True):
-            # Explicit sign-out = "I'm done" — clear draft, clear cached
-            # login, and set a flag so the next script run doesn't silently
-            # restore the login from a not-yet-flushed localStorage entry.
+            # Explicit sign-out = "I'm done" — clear in-progress draft so a
+            # stale form doesn't pop up on next sign-in.
             _clear_draft(user_email)
-            _clear_session()
             custom_auth.logout()
-            st.session_state["_just_signed_out"] = True
             st.rerun()
 
 
