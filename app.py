@@ -633,6 +633,69 @@ def _clear_draft(email):
     st.session_state.pop("_draft_applied_for", None)
 
 
+# ── Login persistence (survives Streamlit WebSocket disconnects) ─
+# Mobile Safari aggressively kills background WebSockets which wipes
+# Streamlit's session state, including the signed-in user. Saving the
+# OAuth user to localStorage lets us restore the login silently on
+# the next page load instead of forcing a sign-in.
+SESSION_STORAGE_KEY = "dispatch_session_v1"
+SESSION_TTL_HOURS = 24
+
+
+def _save_session(user_info):
+    ls = _ls()
+    if not ls or not (user_info or {}).get("email"):
+        return
+    try:
+        ls.setItem(
+            SESSION_STORAGE_KEY,
+            json.dumps({
+                "user_info": user_info,
+                "saved_at_iso": datetime.now().isoformat(timespec="seconds"),
+            }),
+        )
+    except Exception:
+        pass
+
+
+def _load_session():
+    """Return cached user_info dict if it's < TTL hours old, else None."""
+    ls = _ls()
+    if not ls:
+        return None
+    try:
+        raw = ls.getItem(SESSION_STORAGE_KEY)
+    except Exception:
+        return None
+    if not raw:
+        return None
+    try:
+        payload = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    try:
+        saved_at = datetime.fromisoformat(payload.get("saved_at_iso", ""))
+        if (datetime.now() - saved_at).total_seconds() / 3600 > SESSION_TTL_HOURS:
+            try:
+                ls.deleteItem(SESSION_STORAGE_KEY)
+            except Exception:
+                pass
+            return None
+    except (ValueError, TypeError):
+        return None
+    return payload.get("user_info")
+
+
+def _clear_session():
+    ls = _ls()
+    if not ls:
+        return
+    try:
+        ls.deleteItem(SESSION_STORAGE_KEY)
+    except Exception:
+        pass
+
+
 # ── AUTH GATE (custom Google OAuth — bypasses st.login) ───
 AUTH_ENABLED = custom_auth.is_configured()
 
@@ -653,8 +716,17 @@ user_name_from_auth = ""
 if AUTH_ENABLED:
     # If we just came back from Google with ?code=, process it.
     if custom_auth.handle_callback():
+        _save_session(custom_auth.get_user())
         st.rerun()
     user = custom_auth.get_user()
+    # If Streamlit's session lost the login (e.g., iPad Safari killed the
+    # WebSocket), try to restore from localStorage so the pilot doesn't get
+    # punted back to the login screen.
+    if not user:
+        cached = _load_session()
+        if cached:
+            st.session_state["_oauth_user"] = cached
+            user = cached
     if not user:
         _render_logo()
         st.title(config.DISPATCH_TITLE)
@@ -733,12 +805,14 @@ if AUTH_ENABLED:
                     None,
                 )
                 if matched_login:
-                    st.session_state["_oauth_user"] = {
+                    _user_info = {
                         "email": email_lc,
                         "name": matched_login.get("name") or email_lc,
                         "picture": None,
                         "login_method": "fsp_email",
                     }
+                    st.session_state["_oauth_user"] = _user_info
+                    _save_session(_user_info)
                     st.rerun()
                 else:
                     st.error(
@@ -839,6 +913,7 @@ with st.sidebar:
             # Explicit sign-out = "I'm done" — clear any in-progress draft
             # so they don't get a stale form when they sign back in later.
             _clear_draft(user_email)
+            _clear_session()
             custom_auth.logout()
             st.rerun()
 
