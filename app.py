@@ -7,10 +7,15 @@ import hashlib
 import json
 import os
 from datetime import date as date_cls, datetime
+
+import streamlit as st
+
+import config
+
 try:
     from zoneinfo import ZoneInfo
-    SCHOOL_TZ = ZoneInfo("America/New_York")
-except ImportError:
+    SCHOOL_TZ = ZoneInfo(config.SCHOOL_TIMEZONE)
+except Exception:
     from datetime import timezone, timedelta
     SCHOOL_TZ = timezone(timedelta(hours=-4))  # EDT fallback (good enough)
 
@@ -23,11 +28,6 @@ def _school_now():
 
 def _school_today():
     return datetime.now(SCHOOL_TZ).date()
-
-
-import streamlit as st
-
-import config
 import custom_auth
 import sheets_storage
 import storage

@@ -30,6 +30,11 @@ def _csv(val):
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
+# School's local timezone — used to decide "today" and "is this flight over yet"
+# without being thrown off by the Streamlit Cloud server's UTC clock.
+# IANA name. America/New_York handles DST automatically.
+SCHOOL_TIMEZONE = _get("SCHOOL_TIMEZONE", "America/New_York")
+
 # Branding
 COMPANY_NAME = _get("COMPANY_NAME", "Elevation Aviation")
 DISPATCH_TITLE = _get("DISPATCH_TITLE", "Dispatch")

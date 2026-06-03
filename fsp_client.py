@@ -376,15 +376,17 @@ class FSPClient:
     def get_next_reservation_for_student(self, user_id, lookahead_days=90):
         """Return the soonest reservation that hasn't ended yet, or None.
 
-        A reservation is 'still relevant' if its endTime is in the future,
-        i.e., it's either currently active (started but not finished) or
-        scheduled to start later. This means an 8 AM block that ends at noon
-        is still picked at 8:15 AM (in-window), and a flight that already
-        ended at noon won't be picked at 12:30 PM in favour of a later one.
+        A reservation is 'still relevant' if its endTime is in the future.
+        Note: FSP's endTimeUtc field is unreliable (often shows a duration
+        shorter than the local endTime), so we filter generously on the
+        server and re-check locally using the operator-local endTime.
         """
         if not user_id:
             return None
-        now = datetime.utcnow()
+        # FSP's endTimeUtc is unreliable, so be generous with the server-side
+        # filter and re-check locally below. Look back 24h (covers the longest
+        # plausible discrepancy between endTime and endTimeUtc).
+        loose_cutoff = datetime.utcnow() - timedelta(hours=24)
         # Generous start window (1 week back) to be sure currently-active
         # reservations with early start times are included.
         start_window = datetime.combine(
@@ -392,7 +394,7 @@ class FSPClient:
         )
         params = {
             "startTimeUtc": f"Gte:{start_window.strftime('%Y-%m-%dT%H:%M:%SZ')}",
-            "endTimeUtc": f"Gte:{now.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+            "endTimeUtc": f"Gte:{loose_cutoff.strftime('%Y-%m-%dT%H:%M:%SZ')}",
             "userId": f"eq:{user_id}",
             "limit": 100,
         }
@@ -407,14 +409,32 @@ class FSPClient:
         items = self._items(data)
         # Sort by local start time, take soonest non-ended
         items.sort(key=lambda r: r.get("startTime") or "9999")
-        # Cap lookahead client-side too
+        # Cap lookahead client-side
         cutoff = (date.today() + timedelta(days=lookahead_days)).isoformat()
+        # Reliable "has ended?" check: compare local endTime against current
+        # school-local time. Defaults to America/New_York; override via
+        # SCHOOL_TIMEZONE env var if the school moves.
+        try:
+            from zoneinfo import ZoneInfo
+            school_tz = ZoneInfo(config.SCHOOL_TIMEZONE)
+        except Exception:
+            from datetime import timezone as _tz
+            school_tz = _tz(timedelta(hours=-4))
+        now_school = datetime.now(school_tz).replace(tzinfo=None)
         for r in items:
             if not isinstance(r, dict):
                 continue
             local_start = (r.get("startTime") or "")[:10]
             if local_start and local_start > cutoff:
                 continue
+            # Skip if this reservation's local end time has already passed.
+            local_end_str = r.get("endTime") or ""
+            if local_end_str:
+                try:
+                    if datetime.fromisoformat(local_end_str) < now_school:
+                        continue
+                except (ValueError, TypeError):
+                    pass
             return self._normalize_reservation(r)
         return None
 
