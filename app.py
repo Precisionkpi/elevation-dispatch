@@ -1033,11 +1033,22 @@ if selected_student and flight_date:
         # Put flights that haven't ended yet at the top so an instructor with
         # both an earlier (already-flown) and a later (upcoming) flight on
         # the same day defaults to the right one.
-        _now_iso = datetime.now().isoformat()
+        from datetime import timezone as _tz
+        _now_utc = datetime.now(_tz.utc)
+        def _has_ended(r):
+            end_utc_str = r.get("end_time_utc") or ""
+            if not end_utc_str:
+                return False
+            try:
+                end_dt = datetime.fromisoformat(end_utc_str.replace("Z", "+00:00"))
+                if end_dt.tzinfo is None:
+                    end_dt = end_dt.replace(tzinfo=_tz.utc)
+                return end_dt < _now_utc
+            except (ValueError, TypeError):
+                return False
+
         def _relevance(r):
-            end_t = r.get("end_time") or ""
-            is_past = bool(end_t and end_t < _now_iso)
-            return (1 if is_past else 0, r.get("start_time") or "9999")
+            return (1 if _has_ended(r) else 0, r.get("start_time") or "9999")
         reservations.sort(key=_relevance)
 
         def _label(r):
@@ -1046,8 +1057,7 @@ if selected_student and flight_date:
             start = (r.get("start_time") or "")[11:16]
             end = (r.get("end_time") or "")[11:16]
             ac = r.get("aircraft_tail") or "no AC"
-            end_t = r.get("end_time") or ""
-            past_tag = "  · (already ended)" if end_t and end_t < _now_iso else ""
+            past_tag = "  · (already ended)" if _has_ended(r) else ""
             return (
                 f"#{r.get('number')}  {start}–{end}  ·  "
                 f"{pilots} w/ {instr}  ·  {ac}{past_tag}"

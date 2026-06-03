@@ -436,6 +436,7 @@ class FSPClient:
             "start_time": r.get("startTime"),
             "end_time": r.get("endTime"),
             "start_time_utc": r.get("startTimeUtc"),
+            "end_time_utc": r.get("endTimeUtc"),
             "type": (r.get("reservationType") or {}).get("name"),
             "instructor_name": instr_name or None,
             "instructor_id": instr.get("userId") if isinstance(instr, dict) else None,
