@@ -7,6 +7,23 @@ import hashlib
 import json
 import os
 from datetime import date as date_cls, datetime
+try:
+    from zoneinfo import ZoneInfo
+    SCHOOL_TZ = ZoneInfo("America/New_York")
+except ImportError:
+    from datetime import timezone, timedelta
+    SCHOOL_TZ = timezone(timedelta(hours=-4))  # EDT fallback (good enough)
+
+
+def _school_now():
+    """Current time at the school (Eastern), naive (no tzinfo) so it compares
+    cleanly with FSP's naive local-time strings like '2026-06-02T17:00:00'."""
+    return datetime.now(SCHOOL_TZ).replace(tzinfo=None)
+
+
+def _school_today():
+    return datetime.now(SCHOOL_TZ).date()
+
 
 import streamlit as st
 
@@ -1000,14 +1017,16 @@ else:
                          help="FSP student list unavailable; enter manually")
 
 # ── Date (default to student's next upcoming reservation) ──
-default_date = date_cls.today()
+# Use school (Eastern) "today" — the server runs in UTC, but `date.today()`
+# would roll to tomorrow at 8 PM EDT, kicking pilots off today's flight.
+default_date = _school_today()
 if selected_student:
     try:
         next_res = cached_next_reservation(selected_student["id"])
         if next_res and next_res.get("start_time"):
             try:
                 res_date = datetime.fromisoformat(next_res["start_time"]).date()
-                if res_date >= date_cls.today():
+                if res_date >= _school_today():
                     default_date = res_date
             except ValueError:
                 pass
@@ -1032,18 +1051,15 @@ if selected_student and flight_date:
     if reservations:
         # Put flights that haven't ended yet at the top so an instructor with
         # both an earlier (already-flown) and a later (upcoming) flight on
-        # the same day defaults to the right one.
-        from datetime import timezone as _tz
-        _now_utc = datetime.now(_tz.utc)
+        # the same day defaults to the right one. Compare in school local
+        # time so UTC midnight doesn't make today's last flight look ended.
+        _now_school = _school_now()
         def _has_ended(r):
-            end_utc_str = r.get("end_time_utc") or ""
-            if not end_utc_str:
+            end_local = r.get("end_time") or ""
+            if not end_local:
                 return False
             try:
-                end_dt = datetime.fromisoformat(end_utc_str.replace("Z", "+00:00"))
-                if end_dt.tzinfo is None:
-                    end_dt = end_dt.replace(tzinfo=_tz.utc)
-                return end_dt < _now_utc
+                return datetime.fromisoformat(end_local) < _now_school
             except (ValueError, TypeError):
                 return False
 
