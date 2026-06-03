@@ -930,12 +930,6 @@ with st.sidebar:
             _clear_draft(user_email)
             custom_auth.logout()
             st.rerun()
-        # Tiny diagnostic so we can confirm the server picked up the timezone
-        # fix. If this shows UTC time, the rebuild hasn't propagated yet.
-        st.caption(
-            f"server clock: {_school_now().strftime('%H:%M')} "
-            f"({config.SCHOOL_TIMEZONE.split('/')[-1].replace('_', ' ')})"
-        )
 
 
 # ── Header ─────────────────────────────────────────────────
@@ -1028,34 +1022,35 @@ else:
 # Use school (Eastern) "today" — the server runs in UTC, but `date.today()`
 # would roll to tomorrow at 8 PM EDT, kicking pilots off today's flight.
 default_date = _school_today()
-_next_res_debug = "no student selected"
-_loop_trace = []
 if selected_student:
+    # Look up the student's next upcoming reservation directly here (not
+    # through the FSPClient class). The class instance is held by
+    # @st.cache_resource, which on Streamlit Cloud doesn't always pick up
+    # fsp_client.py changes between deploys — calling the API inline
+    # guarantees we always use the latest filter logic.
     try:
-        # INLINED next-reservation lookup so we bypass any stale FSPClient
-        # instance held by @st.cache_resource. Compute the loose UTC window
-        # here directly, query FSP, and pick the first non-ended flight
-        # using school-local end-time comparison.
         from datetime import timedelta as _td
         _now_utc = datetime.utcnow()
         _now_school = _school_now()
+        # FSP's endTimeUtc field is unreliable (often 1-2h shorter than the
+        # local endTime); filter generously on the server, then check
+        # "actually ended?" locally using the reliable endTime field.
         _loose_cutoff = _now_utc - _td(hours=24)
         _start_window = datetime.combine(
             _school_today() - _td(days=7), datetime.min.time()
         )
-        _params = {
-            "startTimeUtc": f"Gte:{_start_window.strftime('%Y-%m-%dT%H:%M:%SZ')}",
-            "endTimeUtc": f"Gte:{_loose_cutoff.strftime('%Y-%m-%dT%H:%M:%SZ')}",
-            "userId": f"eq:{selected_student['id']}",
-            "limit": 100,
-        }
         import requests as _rq
         _resp = _rq.get(
             f"{config.FSP_SCHEDULING_BASE_URL}/operators/{config.FSP_OPERATOR_ID}/reservations",
             headers={"x-subscription-key": config.FSP_API_KEY, "Accept": "application/json"},
-            params=_params, timeout=15,
+            params={
+                "startTimeUtc": f"Gte:{_start_window.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+                "endTimeUtc": f"Gte:{_loose_cutoff.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+                "userId": f"eq:{selected_student['id']}",
+                "limit": 100,
+            },
+            timeout=15,
         )
-        next_res = None
         if _resp.ok:
             _items = _resp.json().get("items", [])
             _items.sort(key=lambda r: r.get("startTime") or "9999")
@@ -1063,39 +1058,22 @@ if selected_student:
                 if not isinstance(r, dict):
                     continue
                 _end_str = r.get("endTime") or ""
-                _ended = False
                 if _end_str:
                     try:
-                        _ended = datetime.fromisoformat(_end_str) < _now_school
+                        if datetime.fromisoformat(_end_str) < _now_school:
+                            continue  # already ended in school-local time
                     except (ValueError, TypeError):
                         pass
-                _loop_trace.append(
-                    f"#{r.get('reservationNumber')} end={_end_str}"
-                    f"{' [SKIP]' if _ended else ' [TAKE]'}"
-                )
-                if _ended:
-                    continue
-                next_res = {
-                    "number": r.get("reservationNumber"),
-                    "start_time": r.get("startTime"),
-                    "end_time": r.get("endTime"),
-                }
+                _start_str = r.get("startTime") or ""
+                try:
+                    res_date = datetime.fromisoformat(_start_str).date()
+                    if res_date >= _school_today():
+                        default_date = res_date
+                except ValueError:
+                    pass
                 break
-        else:
-            _next_res_debug = f"FSP HTTP {_resp.status_code}"
-
-        if next_res and next_res.get("start_time"):
-            _next_res_debug = f"#{next_res.get('number')} {next_res.get('start_time')} (-> {next_res.get('end_time')})"
-            try:
-                res_date = datetime.fromisoformat(next_res["start_time"]).date()
-                if res_date >= _school_today():
-                    default_date = res_date
-            except ValueError:
-                pass
-        elif _resp.ok:
-            _next_res_debug = "FSP returned no upcoming reservation"
-    except Exception as e:
-        _next_res_debug = f"error: {type(e).__name__}: {e}"
+    except Exception:
+        pass  # fall back to today's date silently
 # Make the widget key depend on which student is selected. When a different
 # user signs in (or this user picks a different student), the key changes and
 # Streamlit treats it as a brand-new widget, picking up the fresh default
@@ -1118,12 +1096,6 @@ flight_date = st.date_input(
     help=("Defaults to your next upcoming reservation in FSP. "
           "Change to any date to override."),
 )
-st.caption(
-    f"_debug_ next_res={_next_res_debug} | default_date={default_date} | "
-    f"today={_school_today()} | now={_school_now().strftime('%H:%M:%S')}"
-)
-if _loop_trace:
-    st.caption("_loop_ " + " | ".join(_loop_trace[:6]))
 
 # ── Reservation lookup (student + date) ────────────────────
 reservation = None
