@@ -928,6 +928,12 @@ with st.sidebar:
             _clear_draft(user_email)
             custom_auth.logout()
             st.rerun()
+        # Tiny diagnostic so we can confirm the server picked up the timezone
+        # fix. If this shows UTC time, the rebuild hasn't propagated yet.
+        st.caption(
+            f"server clock: {_school_now().strftime('%H:%M')} "
+            f"({config.SCHOOL_TIMEZONE.split('/')[-1].replace('_', ' ')})"
+        )
 
 
 # ── Header ─────────────────────────────────────────────────
