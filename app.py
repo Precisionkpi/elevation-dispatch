@@ -1038,9 +1038,25 @@ if selected_student:
                 pass
     except FSPError:
         pass
+# Make the widget key depend on which student is selected. When a different
+# user signs in (or this user picks a different student), the key changes and
+# Streamlit treats it as a brand-new widget, picking up the fresh default
+# instead of reusing a stale value from a previous session/render.
+_student_key = (selected_student or {}).get("id", "anon")
+_date_widget_key = f"flight_date_widget__{_student_key}"
+_auto_default_key = f"_flight_date_auto__{_student_key}"
+# If our auto-computed default just changed (e.g. cache TTL expired and a
+# new reservation became "next"), update the widget — unless the user has
+# manually moved it off the previous auto value.
+_prev_auto = st.session_state.get(_auto_default_key)
+_current_widget = st.session_state.get(_date_widget_key)
+if _current_widget is None or _current_widget == _prev_auto:
+    st.session_state[_date_widget_key] = default_date
+st.session_state[_auto_default_key] = default_date
+
 flight_date = st.date_input(
     "Date *",
-    value=default_date,
+    key=_date_widget_key,
     help=("Defaults to your next upcoming reservation in FSP. "
           "Change to any date to override."),
 )
