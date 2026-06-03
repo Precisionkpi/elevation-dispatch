@@ -447,8 +447,10 @@ def cached_reservations(student_id, day_iso):
     )
 
 
-@st.cache_data(ttl=120)
-def cached_next_reservation(student_id):
+@st.cache_data(ttl=30)
+def cached_next_reservation(student_id, _minute_bucket=None):
+    # _minute_bucket is a cache buster — when the wall-clock minute changes,
+    # the cache key changes too, so we never serve a value older than 60 sec.
     return _client().get_next_reservation_for_student(student_id)
 
 
@@ -1026,18 +1028,25 @@ else:
 # Use school (Eastern) "today" — the server runs in UTC, but `date.today()`
 # would roll to tomorrow at 8 PM EDT, kicking pilots off today's flight.
 default_date = _school_today()
+_next_res_debug = "no student selected"
 if selected_student:
     try:
-        next_res = cached_next_reservation(selected_student["id"])
+        # Pass the current minute so the cache invalidates every minute —
+        # otherwise a stale "tomorrow" cached during the rebuild lingers.
+        _bucket = _school_now().strftime("%Y%m%d%H%M")
+        next_res = cached_next_reservation(selected_student["id"], _minute_bucket=_bucket)
         if next_res and next_res.get("start_time"):
+            _next_res_debug = f"#{next_res.get('number')} {next_res.get('start_time')} (-> {next_res.get('end_time')})"
             try:
                 res_date = datetime.fromisoformat(next_res["start_time"]).date()
                 if res_date >= _school_today():
                     default_date = res_date
             except ValueError:
                 pass
-    except FSPError:
-        pass
+        else:
+            _next_res_debug = "FSP returned no upcoming reservation"
+    except FSPError as e:
+        _next_res_debug = f"FSP error: {e}"
 # Make the widget key depend on which student is selected. When a different
 # user signs in (or this user picks a different student), the key changes and
 # Streamlit treats it as a brand-new widget, picking up the fresh default
@@ -1059,6 +1068,10 @@ flight_date = st.date_input(
     key=_date_widget_key,
     help=("Defaults to your next upcoming reservation in FSP. "
           "Change to any date to override."),
+)
+st.caption(
+    f"_debug_ next_res={_next_res_debug} | default_date={default_date} | "
+    f"today={_school_today()}"
 )
 
 # ── Reservation lookup (student + date) ────────────────────
