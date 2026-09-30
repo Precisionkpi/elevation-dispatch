@@ -226,20 +226,29 @@ class FSPClient:
         out.sort(key=lambda s: (not s["ground_aircraft"], s.get("reported_date") or ""))
         return out
 
-    def list_active_user_ids(self):
-        """Return the set of userIds with status='Active' from /users."""
+    def list_inactive_user_ids(self):
+        """Return the set of userIds whose /users record explicitly says
+        they're NOT active (Inactive, Deleted, Suspended, etc.).
+
+        We check for INactive rather than active because /users only lists
+        people with portal accounts. An instructor or student without a
+        portal login won't appear in /users at all — but they can still be
+        an active dispatch pilot per /people and /instructors. If we only
+        allowed people found in /users as Active, those pilots would be
+        silently dropped from the app (breaking their login).
+        """
         data = self._get(
             f"operators/{self.operator_id}/users",
             params={"limit": 500},
         )
-        active = set()
+        inactive = set()
         for u in self._items(data):
             if not isinstance(u, dict):
                 continue
             status_name = (u.get("status") or {}).get("name") if isinstance(u.get("status"), dict) else None
-            if status_name == "Active":
-                active.add(u.get("userId"))
-        return active
+            if status_name and status_name != "Active":
+                inactive.add(u.get("userId"))
+        return inactive
 
     # ── Pilots (anyone who can fill out a dispatch) ────────
     def list_pilots(self, allowed_roles=(
@@ -256,11 +265,13 @@ class FSPClient:
             f"operators/{self.operator_id}/people",
             params={"limit": 500},
         )
-        # Cross-reference with /users to skip Inactive / Deleted accounts
+        # Cross-reference with /users to skip Inactive / Deleted accounts.
+        # A person missing from /users entirely (e.g. instructor with no
+        # portal login) is treated as active — do NOT drop them.
         try:
-            active_ids = self.list_active_user_ids()
+            inactive_ids = self.list_inactive_user_ids()
         except FSPError:
-            active_ids = None  # fall back to no filtering if /users fails
+            inactive_ids = set()  # fall back to no filtering if /users fails
         allowed = set(allowed_roles)
         # Map FSP role name -> the label we show. Both Instructor & Administrator
         # map to "Instructor" so admins get the instructor experience.
@@ -278,8 +289,9 @@ class FSPClient:
             if not isinstance(p, dict):
                 continue
             uid = p.get("userGuidId")
-            # Skip if /users says this person is Inactive / Deleted
-            if active_ids is not None and uid and uid not in active_ids:
+            # Skip only if /users explicitly says this person is Inactive.
+            # Missing from /users = fine (instructor without portal login).
+            if uid and uid in inactive_ids:
                 continue
             role_names = {(r or {}).get("name") for r in (p.get("roles") or []) if r}
             flying_roles = role_names & allowed
